@@ -24,11 +24,11 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Topic :: Scientific/Engineering :: Machine Learning",
 ]
 dependencies = [
     "strands-agents",
-    "httpx>=0.28.1"
+    "httpx",
+    "transformers",
 ]
 
 [project.urls]
@@ -39,16 +39,23 @@ Issues = "https://github.com/horizon-rl/strands-sglang/issues"
 
 [project.optional-dependencies]
 dev = [
-    "pre-commit",
+    # Testing
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.0.0",
+    # Linting & Build
+    "pre-commit",
     "ruff>=0.1.0",
     "twine>=4.0.0",
     "build>=0.10.0",
+    # Development
     "ipykernel>=7.1.0",
-
+    # Agent-level testing
+    "strands-agents-tools",
+]
+aws = [
+    "bedrock-agentcore",
 ]
 
 [tool.hatch.build.targets.wheel]
