@@ -50,6 +50,42 @@ class TestToolCallParseResult:
         assert result.is_error is True
         assert result.raw == '{"malformed": json}'
 
+    def test_model_input_success(self):
+        """model_input returns JSON-encoded input for successful parses."""
+        result = ToolCallParseResult(
+            id="call_123",
+            name="my_tool",
+            input={"arg": "value", "num": 42},
+        )
+        assert result.model_input == '{"arg": "value", "num": 42}'
+
+    def test_model_input_empty(self):
+        """model_input returns empty JSON object for empty input."""
+        result = ToolCallParseResult(id="call_123", name="my_tool", input={})
+        assert result.model_input == "{}"
+
+    def test_model_input_error(self):
+        """model_input returns raw content for error parses."""
+        result = ToolCallParseResult(
+            id="call_456",
+            name="unknown_tool",
+            input={},
+            raw='{"malformed": json}',
+        )
+        assert result.model_input == '{"malformed": json}'
+
+    def test_model_input_error_empty_raw(self):
+        """model_input returns empty string if raw is empty."""
+        result = ToolCallParseResult(
+            id="call_789",
+            name="some_tool",
+            input={},
+            raw="",
+        )
+        # Note: empty raw still counts as error (raw is not None)
+        assert result.is_error is True
+        assert result.model_input == ""
+
     def test_immutability(self):
         """ToolCallParseResult is frozen."""
         result = ToolCallParseResult(id="call_123", name="tool", input={})

@@ -49,7 +49,11 @@ def _make_tool_call_id() -> str:
 
 @dataclass(frozen=True, slots=True)
 class ToolCallParseResult:
-    """A parsed tool call request."""
+    """A parsed tool call request.
+
+    For successful parses: name and input are populated, raw is None.
+    For parse errors: name is extracted or UNKNOWN_TOOL_NAME, raw contains the unparseable content.
+    """
 
     id: str
     name: str
@@ -60,6 +64,17 @@ class ToolCallParseResult:
     def is_error(self) -> bool:
         """Check if this represents a parse error."""
         return self.raw is not None
+
+    @property
+    def model_input(self) -> str:
+        """Get the input string to pass to the tool executor.
+
+        For successful parses, returns JSON-encoded input.
+        For errors, returns the raw content (so model sees its mistake).
+        """
+        if self.is_error:
+            return self.raw or ""
+        return json.dumps(self.input)
 
 
 class ToolCallParser(ABC):
@@ -195,7 +210,7 @@ class HermesToolCallParser(ToolCallParser):
         name_match = _NAME_PATTERN.search(raw_content)
         name = name_match.group(1) if name_match else UNKNOWN_TOOL_NAME
 
-        logger.warning("Tool call parse error: %s", error)
+        logger.warning(f"Tool call parse error: {error}")
 
         return ToolCallParseResult(
             id=tool_call_id,
