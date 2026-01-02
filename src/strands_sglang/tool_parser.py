@@ -88,6 +88,19 @@ class ToolCallParser(ABC):
         foo
     """
 
+    @property
+    def message_separator(self) -> str:
+        """Separator between messages in the chat template.
+
+        Different tokenizers use different separators between messages.
+        This is used during incremental tokenization to ensure the TITO
+        trajectory matches what `apply_chat_template` would produce.
+
+        Returns:
+            The separator string (default: newline for most models).
+        """
+        return "\n"
+
     @abstractmethod
     def parse(self, text: str) -> list[ToolCallParseResult]:
         """Parse tool calls from model output text.
@@ -139,6 +152,11 @@ class HermesToolCallParser(ToolCallParser):
     - Models using similar XML-wrapped JSON tool call format
 
     Only handles JSONDecodeError; Strands validates arguments against tool schemas.
+
+    Chat Template Notes:
+        Qwen3's chat template uses newline as separator between messages:
+        `<|im_start|>role\\ncontent<|im_end|>\\n<|im_start|>...`
+        The message_separator property returns "\\n" to match this format.
 
     Attributes:
         bot_token: Opening tag for tool calls (default: "<tool_call>").
