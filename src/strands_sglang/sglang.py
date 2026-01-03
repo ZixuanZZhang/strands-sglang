@@ -75,7 +75,7 @@ class SGLangModel(Model):
 
     Example:
         >>> from transformers import AutoTokenizer
-        >>> tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-4B-Instruct")
+        >>> tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-4B-Thinking-2507")
         >>> model = SGLangModel(tokenizer=tokenizer, base_url="http://localhost:8000")
         >>> # After generation:
         >>> model.token_manager.token_ids    # Full token trajectory

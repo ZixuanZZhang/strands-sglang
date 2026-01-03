@@ -34,7 +34,7 @@ Start an SGLang server first:
 
 ```bash
 python -m sglang.launch_server \
-    --model-path Qwen/Qwen3-4B \
+    --model-path Qwen/Qwen3-4B-Thinking-2507 \
     --port 8000 \
     --host 0.0.0.0 \
     --tp-size 8 \
@@ -76,7 +76,7 @@ pytest --help | grep sglang
 # Configure via CLI
 pytest tests/integration/ \
     --sglang-base-url=http://localhost:8000 \
-    --sglang-model-id=Qwen/Qwen3-4B
+    --sglang-model-id=Qwen3-4B-Thinking-2507
 ```
 
 ### Environment Variables
@@ -84,7 +84,7 @@ pytest tests/integration/ \
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SGLANG_BASE_URL` | `http://localhost:8000` | SGLang server URL |
-| `SGLANG_MODEL_ID` | `Qwen/Qwen3-4B` | Model ID |
+| `SGLANG_MODEL_ID` | `Qwen/Qwen3-4B-Thinking-2507` | Model ID |
 
 ```bash
 SGLANG_BASE_URL=http://my-server:8000 pytest tests/integration/
@@ -155,7 +155,7 @@ segment_info = model.token_manager.segment_info  # [(is_output, length), ...]
 
 ### Thinking Model Behavior
 
-For thinking models (e.g., Qwen3-4B base), the chat template **automatically strips
+For thinking models (e.g., Qwen3-4B-Thinking-2507), the chat template **automatically strips
 `<think>` blocks from historical assistant messages** during multi-turn prompts.
 
 This means:

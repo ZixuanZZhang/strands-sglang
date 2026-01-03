@@ -37,7 +37,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m sglang.launch_server \
-    --model-path Qwen/Qwen3-4B \
+    --model-path Qwen/Qwen3-4B-Thinking-2507 \
     --port 8000 \
     --host 0.0.0.0
 ```
@@ -55,11 +55,11 @@ from strands_sglang import SGLangModel
 
 async def main():
     # Initialize model with tokenizer
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-4B")
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-4B-Thinking-2507")
     model = SGLangModel(
         tokenizer=tokenizer,
         base_url="http://localhost:8000",
-        model_id="Qwen/Qwen3-4B",
+        model_id="Qwen/Qwen3-4B-Thinking-2507",
     )
 
     # Create agent with tools
@@ -163,7 +163,7 @@ model.reset()
 model = SGLangModel(
     tokenizer=tokenizer,           # Required: HuggingFace tokenizer
     base_url="http://localhost:8000",  # SGLang server URL
-    model_id="Qwen/Qwen3-4B",      # Optional: model identifier
+    model_id="Qwen/Qwen3-4B-Thinking-2507",  # Optional: model identifier
     tool_call_parser=HermesToolCallParser(),  # Tool call format parser
     params={                        # Sampling parameters
         "max_new_tokens": 512,
@@ -189,19 +189,19 @@ Requires a running SGLang server:
 
 ```bash
 # Start server first
-python -m sglang.launch_server --model-path Qwen/Qwen3-4B --port 8000
+python -m sglang.launch_server --model-path Qwen/Qwen3-4B-Thinking-2507 --port 8000
 
 # Run tests
 pytest tests/integration/ -v \
     --sglang-base-url=http://localhost:8000 \
-    --sglang-model-id=Qwen/Qwen3-4B
+    --sglang-model-id=Qwen/Qwen3-4B-Thinking-2507
 ```
 
 Or configure via environment variables:
 
 ```bash
 export SGLANG_BASE_URL=http://localhost:8000
-export SGLANG_MODEL_ID=Qwen/Qwen3-4B
+export SGLANG_MODEL_ID=Qwen/Qwen3-4B-Thinking-2507
 pytest tests/integration/ -v
 ```
 
