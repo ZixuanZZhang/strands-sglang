@@ -127,7 +127,7 @@ model = SGLangModel(
 )
 ```
 
-> See more sampling params options at [SGLang's `/generate` endpoint](https://docs.sglang.io/basic_usage/sampling_params.html).
+> See more sampling params options at SGLang's [documentation](https://docs.sglang.io/basic_usage/sampling_params.html).
 
 ## Testing
 
