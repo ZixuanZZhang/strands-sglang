@@ -112,21 +112,6 @@ class ToolCallParser(ABC):
         """
         ...
 
-    @abstractmethod
-    def strip_markup(self, text: str) -> str:
-        """Strip tool call markup from text.
-
-        Used to remove raw markup when structured tool_calls are available,
-        avoiding duplication in chat templates.
-
-        Args:
-            text: Text potentially containing tool call markup.
-
-        Returns:
-            Text with tool call markup removed.
-        """
-        ...
-
     def __call__(self, text: str) -> list[dict[str, Any]]:
         """Parse tool calls (callable interface for backwards compatibility).
 
@@ -183,11 +168,6 @@ class HermesToolCallParser(ToolCallParser):
             rf"{re.escape(self.bot_token)}\s*(.*?)\s*{re.escape(self.eot_token)}",
             re.DOTALL,
         )
-        # Pattern for stripping (includes trailing whitespace)
-        self._strip_pattern = re.compile(
-            rf"{re.escape(self.bot_token)}.*?{re.escape(self.eot_token)}\s*",
-            re.DOTALL,
-        )
 
     @property
     def message_separator(self) -> str:
@@ -200,17 +180,6 @@ class HermesToolCallParser(ToolCallParser):
         Qwen models use newline `\n` as separator between messages.
         """
         return "\n"
-
-    def strip_markup(self, text: str) -> str:
-        """Strip tool call markup from text.
-
-        Args:
-            text: Text potentially containing tool call markup.
-
-        Returns:
-            Text with tool call markup removed.
-        """
-        return self._strip_pattern.sub("", text).strip()
 
     def parse(self, text: str) -> list[ToolCallParseResult]:
         """Parse tool calls from model output.
