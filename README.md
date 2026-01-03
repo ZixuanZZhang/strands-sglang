@@ -88,7 +88,7 @@ For RL training with [Slime](https://github.com/THUDM/slime/), run async rollout
 async def generate(args, sample: Sample, sampling_params) -> Sample:
     ...
     # The whole agent loop logic in a few lines
-    url = f"http://{args.sglang_router_ip}:{args.sglang_router_port}/generate"
+    url = f"http://{args.sglang_router_ip}:{args.sglang_router_port}"
     model = SGLangModel(tokenizer=tokenizer, base_url=url)
     limiter = ToolIterationLimiter(max_iterations=5)  # Optional: control maximum tool iteration
     agent = Agent(model=model, tools=[calculator], hooks[limiter], system_prompt="...")
