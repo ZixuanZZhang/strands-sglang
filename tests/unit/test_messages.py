@@ -44,6 +44,11 @@ class TestFormatRequestMessages:
     When strands stores tool calls, it has BOTH:
     - A text block with raw <tool_call> markup
     - A toolUse block with structured data
+
+    IMPORTANT: For TITO (Token-In/Token-Out) preservation:
+    - Raw <tool_call> markup in content is PRESERVED (not stripped)
+    - The tool_calls field is DELETED (not added)
+    - This ensures the exact generation order (e.g., <think>...<tool_call>...) is maintained
     """
 
     # --- Basic Message Types ---
@@ -110,7 +115,7 @@ class TestFormatRequestMessages:
     # --- Tool Calls (correct strands format) ---
 
     def test_assistant_with_tool_calls(self, model):
-        """Assistant message with toolUse in content array has markup stripped."""
+        """Assistant message with toolUse preserves raw markup for TITO."""
         messages = [
             {
                 "role": "assistant",
@@ -129,15 +134,14 @@ class TestFormatRequestMessages:
         result = model.format_request_messages(messages)
 
         assert len(result) == 1
-        # tool_calls should be present (from OpenAI formatter)
-        assert "tool_calls" in result[0]
-        assert result[0]["tool_calls"][0]["function"]["name"] == "calc"
-        # Content should have <tool_call> stripped
-        assert "<tool_call>" not in result[0]["content"]
+        # tool_calls field should be DELETED (not added) for TITO preservation
+        assert "tool_calls" not in result[0]
+        # Raw <tool_call> markup should be PRESERVED
+        assert "<tool_call>" in result[0]["content"]
         assert "I will calculate." in result[0]["content"]
 
     def test_tool_call_only_message(self, model):
-        """Assistant message with only tool_call, no other text."""
+        """Assistant message with only tool_call preserves raw markup for TITO."""
         messages = [
             {
                 "role": "assistant",
@@ -156,12 +160,13 @@ class TestFormatRequestMessages:
         result = model.format_request_messages(messages)
 
         assert len(result) == 1
-        assert "tool_calls" in result[0]
-        # Content should be empty after stripping
-        assert result[0]["content"].strip() == ""
+        # tool_calls field should be DELETED for TITO preservation
+        assert "tool_calls" not in result[0]
+        # Raw <tool_call> markup should be PRESERVED
+        assert "<tool_call>" in result[0]["content"]
 
-    def test_multiple_tool_calls_stripped(self, model):
-        """Multiple tool_call blocks are all stripped."""
+    def test_multiple_tool_calls_preserved(self, model):
+        """Multiple tool_call blocks are all preserved for TITO."""
         messages = [
             {
                 "role": "assistant",
@@ -175,14 +180,16 @@ class TestFormatRequestMessages:
         result = model.format_request_messages(messages)
 
         assert len(result) == 1
-        # Both tool_call blocks should be stripped
+        # tool_calls field should be DELETED for TITO preservation
+        assert "tool_calls" not in result[0]
+        # All tool_call blocks should be PRESERVED
         content = result[0]["content"]
-        assert "<tool_call>" not in content
-        assert "</tool_call>" not in content
+        assert "<tool_call>" in content
+        assert "</tool_call>" in content
         assert "text" in content  # The text between should remain
 
-    def test_multiline_tool_call_stripped(self, model):
-        """Tool call spanning multiple lines is stripped."""
+    def test_multiline_tool_call_preserved(self, model):
+        """Tool call spanning multiple lines is preserved for TITO."""
         messages = [
             {
                 "role": "assistant",
@@ -202,7 +209,10 @@ class TestFormatRequestMessages:
         result = model.format_request_messages(messages)
 
         content = result[0]["content"]
-        assert "<tool_call>" not in content
+        # tool_calls field should be DELETED for TITO preservation
+        assert "tool_calls" not in result[0]
+        # Raw markup should be PRESERVED
+        assert "<tool_call>" in content
         assert "Prefix" in content
         assert "Suffix" in content
 
@@ -268,8 +278,8 @@ class TestFormatRequestMessages:
 
     # --- Custom Parser Tokens ---
 
-    def test_custom_tokens_strip_correctly(self, mock_tokenizer):
-        """Custom parser tokens are used for stripping."""
+    def test_custom_tokens_preserved(self, mock_tokenizer):
+        """Custom parser tokens are preserved for TITO (same as default)."""
         custom_parser = HermesToolCallParser(
             bot_token="<function>",
             eot_token="</function>",
@@ -287,8 +297,10 @@ class TestFormatRequestMessages:
         ]
         result = model.format_request_messages(messages)
 
-        # Custom tokens should be stripped
-        assert "<function>" not in result[0]["content"]
+        # tool_calls field should be DELETED for TITO preservation
+        assert "tool_calls" not in result[0]
+        # Custom tokens should be PRESERVED (raw content kept as-is)
+        assert "<function>" in result[0]["content"]
         assert "Call:" in result[0]["content"]
 
     def test_custom_tokens_preserve_default_markup(self, mock_tokenizer):

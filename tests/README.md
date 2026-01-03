@@ -34,11 +34,11 @@ Start an SGLang server first:
 
 ```bash
 python -m sglang.launch_server \
-    --model-path Qwen/Qwen3-4B-Instruct-2507 \
+    --model-path Qwen/Qwen3-4B \
     --port 8000 \
     --host 0.0.0.0 \
     --tp-size 8 \
-    --mem-fraction-static 0.9
+    --mem-fraction-static 0.7
 ```
 
 | Parameter | Description |
@@ -76,7 +76,7 @@ pytest --help | grep sglang
 # Configure via CLI
 pytest tests/integration/ \
     --sglang-base-url=http://localhost:8000 \
-    --sglang-model-id=Qwen/Qwen3-4B-Instruct-2507
+    --sglang-model-id=Qwen/Qwen3-4B
 ```
 
 ### Environment Variables
@@ -84,7 +84,7 @@ pytest tests/integration/ \
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SGLANG_BASE_URL` | `http://localhost:8000` | SGLang server URL |
-| `SGLANG_MODEL_ID` | `Qwen/Qwen3-4B-Instruct-2507` | Model ID |
+| `SGLANG_MODEL_ID` | `Qwen/Qwen3-4B` | Model ID |
 
 ```bash
 SGLANG_BASE_URL=http://my-server:8000 pytest tests/integration/
@@ -140,3 +140,34 @@ The `TestRetokenizationDrift` class ensures:
 - Tool use doesn't introduce drift
 
 This is essential for computing correct policy gradients in RL.
+
+## Trajectory Data for RL Training
+
+Access trajectory data directly from `token_manager`:
+
+```python
+# After generation:
+token_ids = model.token_manager.token_ids      # All tokens
+output_mask = model.token_manager.output_mask  # True = model output (for loss)
+logprobs = model.token_manager.logprobs        # Log probabilities
+segment_info = model.token_manager.segment_info  # [(is_output, length), ...]
+```
+
+### Thinking Model Behavior
+
+For thinking models (e.g., Qwen3-4B base), the chat template **automatically strips
+`<think>` blocks from historical assistant messages** during multi-turn prompts.
+
+This means:
+- **Turn 1 response**: Contains `<think>` (model generated it)
+- **Turn 2 prompt**: Previous assistant message has `<think>` **stripped** by template
+- **Turn 2 response**: Contains `<think>` (model generated it)
+
+TITO captures exactly what the model saw during generation. Whether historical
+thinking is stripped is determined by the chat template, not by our code.
+
+The `test_multi_turn_message_token_match` test is **skipped** for thinking models
+because `apply_chat_template` on final messages produces different tokens than TITO
+(which accumulated tokens incrementally during generation).
+
+The `TestRetokenizationDrift` tests verify TITO self-consistency for all models.

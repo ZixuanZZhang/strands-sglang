@@ -33,8 +33,6 @@ Configuration:
 
 import os
 
-import pytest
-
 
 def pytest_addoption(parser):
     """Add command-line options for SGLang configuration."""
@@ -47,8 +45,8 @@ def pytest_addoption(parser):
     parser.addoption(
         "--sglang-model-id",
         action="store",
-        default=os.environ.get("SGLANG_MODEL_ID", "Qwen/Qwen3-4B-Instruct-2507"),
-        help="Model ID (default: Qwen/Qwen3-4B-Instruct-2507 or SGLANG_MODEL_ID env var)",
+        default=os.environ.get("SGLANG_MODEL_ID", "Qwen/Qwen3-4B"),
+        help="Model ID (default: Qwen/Qwen3-4B or SGLANG_MODEL_ID env var)",
     )
 
 

@@ -44,14 +44,6 @@ def sglang_model_id(request):
     return request.config.getoption("--sglang-model-id")
 
 
-# Module-level constants for backward compatibility with direct imports
-# These are populated at import time from environment variables
-import os
-
-BASE_URL = os.environ.get("SGLANG_BASE_URL", "http://localhost:8000")
-MODEL_ID = os.environ.get("SGLANG_MODEL_ID", "Qwen/Qwen3-4B-Instruct-2507")
-
-
 @pytest.fixture(scope="module")
 def tokenizer(sglang_model_id):
     """Load tokenizer for the configured model."""
