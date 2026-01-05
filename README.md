@@ -164,9 +164,14 @@ pytest tests/integration/ -v
 
 ## Contributing
 
+We warmly welcome contributions! Whether it's new features, performance tuning, or UX feedback, feel free to start a discussion with an issue or jump straight to a PR 😊
+
+Use `pre-commit` to ensure code style consistency for your commits:
+
 ```bash
 pip install -e ".[dev]"
 pre-commit install
+pre-commit run --all-files --show-diff-on-failure --color=always
 ```
 
 Now `git commit` will auto-run linting and formatting checks.
