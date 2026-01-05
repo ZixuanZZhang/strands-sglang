@@ -8,7 +8,7 @@ This happens because `tokenizer.encode()` may produce different token sequences 
 
 ```bash
 # Start sglang server
-python -m sglang.launch_server --model-path Qwen/Qwen3-4B-Thinking-2507 --port 8000
+python -m sglang.launch_server --model-path Qwen/Qwen3-4B-Thinking-2507 --port 30000
 
 # Run example
 python examples/retokenization_drift/main.py
