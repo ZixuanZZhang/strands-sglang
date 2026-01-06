@@ -25,11 +25,21 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
+import time
 from typing import Any, AsyncGenerator
 
 import httpx
 
 logger = logging.getLogger(__name__)
+
+# ============================================================================
+# DEBUG: HTTP request tracking
+# ============================================================================
+_http_lock = threading.Lock()
+_active_requests = 0
+_peak_requests = 0
+_total_requests = 0
 
 # OpenAI's default connection limit (from openai/_constants.py)
 DEFAULT_MAX_CONNECTIONS = 1000
@@ -85,15 +95,18 @@ class SGLangClient:
         # timeout=None means infinite wait (like SLIME's httpx.Timeout(None))
         http_timeout = httpx.Timeout(timeout, connect=connect_timeout) if timeout else httpx.Timeout(None)
 
+        # FIX: Set max_keepalive_connections equal to max_connections to avoid connection churn
+        # By default httpx only keeps 20 connections alive, which can cause issues with high concurrency
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=http_timeout,
-            limits=httpx.Limits(max_connections=max_connections),
+            limits=httpx.Limits(max_connections=max_connections, max_keepalive_connections=max_connections),
         )
 
         logger.info(
             f"SGLangClient initialized: base_url={self.base_url}, "
-            f"max_connections={max_connections}, timeout={timeout}, max_retries={max_retries}"
+            f"max_connections={max_connections}, max_keepalive={max_connections}, "
+            f"timeout={timeout}, max_retries={max_retries}"
         )
 
     @classmethod
@@ -206,6 +219,8 @@ class SGLangClient:
                 or after all retries exhausted.
             httpx.ConnectError: For connection failures after retries exhausted.
         """
+        global _active_requests, _peak_requests, _total_requests
+
         payload: dict[str, Any] = {
             "input_ids": input_ids,
             "stream": True,
@@ -223,39 +238,58 @@ class SGLangClient:
 
         last_error: Exception | None = None
 
-        for attempt in range(self.max_retries + 1):
-            try:
-                async with self._client.stream("POST", "/generate", json=payload) as response:
-                    response.raise_for_status()
-                    async for event in self._iter_sse_events(response):
-                        yield event
-                    return  # Success, exit retry loop
+        # DEBUG: Track request start
+        t_start = time.perf_counter()
+        with _http_lock:
+            _active_requests += 1
+            _total_requests += 1
+            _peak_requests = max(_peak_requests, _active_requests)
+            req_id = _total_requests
+        logger.info(
+            f"[HTTP] REQUEST_START id={req_id} active={_active_requests} peak={_peak_requests} input_len={len(input_ids)}"
+        )
 
-            except Exception as e:
-                last_error = e
+        try:
+            for attempt in range(self.max_retries + 1):
+                try:
+                    async with self._client.stream("POST", "/generate", json=payload) as response:
+                        response.raise_for_status()
+                        async for event in self._iter_sse_events(response):
+                            yield event
+                        return  # Success, exit retry loop
 
-                # Check if error is retryable
-                if not self._is_retryable_error(e):
-                    raise  # Non-retryable error (e.g., 400 Bad Request)
+                except Exception as e:
+                    last_error = e
 
-                # Log and retry
-                response_text = e.response.text if isinstance(e, httpx.HTTPStatusError) else None
-                if attempt < self.max_retries:
-                    logger.warning(
-                        f"SGLang request failed (attempt {attempt + 1}/{self.max_retries + 1}): "
-                        f"{type(e).__name__}: {e}, response={response_text}. Retrying in {self.retry_delay}s..."
-                    )
-                    await asyncio.sleep(self.retry_delay)
-                else:
-                    logger.error(
-                        f"SGLang request failed after {self.max_retries + 1} attempts: "
-                        f"{type(e).__name__}: {e}, response={response_text}"
-                    )
-                    raise
+                    # Check if error is retryable
+                    if not self._is_retryable_error(e):
+                        raise  # Non-retryable error (e.g., 400 Bad Request)
 
-        # Should not reach here, but just in case
-        if last_error:
-            raise last_error
+                    # Log and retry
+                    response_text = e.response.text if isinstance(e, httpx.HTTPStatusError) else None
+                    if attempt < self.max_retries:
+                        logger.warning(
+                            f"SGLang request failed (attempt {attempt + 1}/{self.max_retries + 1}): "
+                            f"{type(e).__name__}: {e}, response={response_text}. Retrying in {self.retry_delay}s..."
+                        )
+                        await asyncio.sleep(self.retry_delay)
+                    else:
+                        logger.error(
+                            f"SGLang request failed after {self.max_retries + 1} attempts: "
+                            f"{type(e).__name__}: {e}, response={response_text}"
+                        )
+                        raise
+
+            # Should not reach here, but just in case
+            if last_error:
+                raise last_error
+
+        finally:
+            # DEBUG: Track request end
+            t_elapsed = time.perf_counter() - t_start
+            with _http_lock:
+                _active_requests -= 1
+            logger.info(f"[HTTP] REQUEST_END id={req_id} active={_active_requests} elapsed={t_elapsed:.1f}s")
 
     async def health(self) -> bool:
         """Check if SGLang server is healthy.
