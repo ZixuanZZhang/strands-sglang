@@ -57,7 +57,7 @@ pytest --help | grep sglang
 # Configure via CLI
 pytest tests/integration/ \
     --sglang-base-url=http://localhost:30000 \
-    --sglang-model-id=Qwen3-4B-Instruct-2507
+    --sglang-model-id=Qwen/Qwen3-4B-Instruct-2507
 ```
 
 ### Environment Variables
