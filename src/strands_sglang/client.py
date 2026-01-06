@@ -16,8 +16,8 @@
 
 Aligned with SLIME's http_utils.py for RL training stability:
 - Aggressive retry (60 attempts by default)
-- Retries on transient server errors (500/502/503/504)
-- Optional infinite timeout for long generations
+- Retries on all transient errors (like SLIME)
+- Infinite timeout by default for long generations
 """
 
 from __future__ import annotations
@@ -34,8 +34,10 @@ logger = logging.getLogger(__name__)
 # OpenAI's default connection limit (from openai/_constants.py)
 DEFAULT_MAX_CONNECTIONS = 1000
 
-# Retryable HTTP status codes (transient server errors)
-RETRYABLE_STATUS_CODES = {500, 502, 503, 504}
+# Non-retryable HTTP status codes (client errors that won't self-resolve)
+# Everything else is retried (aligned with SLIME's aggressive retry philosophy)
+# Note: 408 (Request Timeout) and 429 (Rate Limited) ARE retried (from OpenAI)
+NON_RETRYABLE_STATUS_CODES = {400, 401, 403, 404, 405, 406, 409, 410, 411, 412, 413, 414, 415, 422}
 
 
 class SGLangClient:
@@ -123,14 +125,22 @@ class SGLangClient:
                 continue
 
     def _is_retryable_error(self, e: Exception) -> bool:
-        """Check if an error is retryable (transient)."""
-        # Connection errors are retryable
-        if isinstance(e, (httpx.ConnectError, httpx.ReadTimeout, httpx.PoolTimeout)):
+        """Check if an error is retryable.
+
+        Aligned with SLIME's philosophy: retry aggressively on most errors.
+        Only non-retryable errors are client errors (4xx) that won't self-resolve.
+
+        From OpenAI: 408 (Request Timeout) and 429 (Rate Limited) ARE retried.
+        """
+        if isinstance(e, httpx.HTTPStatusError):
+            status = e.response.status_code
+            # Don't retry non-recoverable client errors
+            if status in NON_RETRYABLE_STATUS_CODES:
+                return False
+            # Retry everything else: 5xx, 408, 429, etc.
             return True
-        # Server errors (5xx) are retryable
-        if isinstance(e, httpx.HTTPStatusError) and e.response.status_code in RETRYABLE_STATUS_CODES:
-            return True
-        return False
+        # Retry all connection/timeout errors
+        return True
 
     async def generate(
         self,
@@ -154,9 +164,9 @@ class SGLangClient:
             Parsed SSE events containing text, output_ids, logprobs, and metadata.
 
         Raises:
-            httpx.HTTPStatusError: For non-retryable HTTP errors (4xx).
+            httpx.HTTPStatusError: For non-retryable client errors (400, 401, 403, etc.)
+                or after all retries exhausted.
             httpx.ConnectError: For connection failures after retries exhausted.
-            httpx.TimeoutException: For timeout errors after retries exhausted.
         """
         payload: dict[str, Any] = {
             "input_ids": input_ids,
