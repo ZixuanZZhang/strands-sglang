@@ -170,6 +170,55 @@ class TestToolIterationLimiterBasic:
 class TestToolIterationLimiterTrajectory:
     """Tests for trajectory cleanliness after limiter stops."""
 
+    async def test_iteration_count_matches_tool_messages(self, fresh_model):
+        """Limiter iteration count should match tool messages in trajectory."""
+        limiter = ToolIterationLimiter(max_iterations=2)
+        agent = Agent(
+            model=fresh_model,
+            tools=[calculator],
+            system_prompt=SYSTEM_PROMPT,
+            hooks=[limiter],
+        )
+
+        # Run until limit or completion
+        try:
+            await agent.invoke_async(SEQUENTIAL_PROBLEM)
+        except (MaxToolIterationsReachedError, EventLoopException):
+            pass  # Expected if limit reached
+
+        # Get trajectory from model
+        trajectory = fresh_model.format_request_messages(agent.messages, None)
+
+        # Count tool messages in trajectory
+        tool_message_count = sum(1 for msg in trajectory if msg["role"] == "tool")
+
+        # Iteration count should match tool message count
+        assert limiter.iteration_count == tool_message_count, (
+            f"Mismatch: limiter.iteration_count={limiter.iteration_count}, "
+            f"tool_message_count={tool_message_count}"
+        )
+
+    async def test_iteration_count_matches_tool_messages_on_completion(self, fresh_model):
+        """Iteration count matches tool messages when agent completes normally."""
+        limiter = ToolIterationLimiter(max_iterations=10)
+        agent = Agent(
+            model=fresh_model,
+            tools=[calculator],
+            system_prompt=SYSTEM_PROMPT,
+            hooks=[limiter],
+        )
+
+        # Should complete without hitting limit
+        await agent.invoke_async(SIMPLE_PROBLEM)
+
+        trajectory = fresh_model.format_request_messages(agent.messages, None)
+        tool_message_count = sum(1 for msg in trajectory if msg["role"] == "tool")
+
+        assert limiter.iteration_count == tool_message_count, (
+            f"Mismatch: limiter.iteration_count={limiter.iteration_count}, "
+            f"tool_message_count={tool_message_count}"
+        )
+
     async def test_trajectory_is_clean_after_limit(self, fresh_model):
         """Token trajectory should be clean (complete iterations only)."""
         limiter = ToolIterationLimiter(max_iterations=1)
