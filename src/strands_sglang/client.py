@@ -191,8 +191,9 @@ class SGLangClient:
         sampling_params: dict[str, Any] | None = None,
         return_logprob: bool = True,
         logprob_start_len: int = 0,
+        stream: bool = False,
     ) -> AsyncGenerator[dict[str, Any], None]:
-        """Stream generation from SGLang `/generate` endpoint.
+        """Generate from SGLang `/generate` endpoint.
 
         Args:
             input_ids: Input token IDs.
@@ -200,9 +201,11 @@ class SGLangClient:
             sampling_params: Sampling parameters (temperature, top_p, max_new_tokens, etc.).
             return_logprob: Whether to return log probabilities (default: True).
             logprob_start_len: Start position for logprob computation (default: 0).
+            stream: Whether to stream responses (default: False for better parallelism).
 
         Yields:
-            Parsed SSE events containing text, output_ids, logprobs, and metadata.
+            For streaming: Parsed SSE events containing text, output_ids, logprobs, and metadata.
+            For non-streaming: Single response dict with complete generation result.
 
         Raises:
             httpx.HTTPStatusError: For non-retryable client errors (400, 401, 403, etc.)
@@ -211,7 +214,7 @@ class SGLangClient:
         """
         payload: dict[str, Any] = {
             "input_ids": input_ids,
-            "stream": True,
+            "stream": stream,
         }
 
         if model:
@@ -228,10 +231,20 @@ class SGLangClient:
 
         for attempt in range(self.max_retries + 1):
             try:
-                async with self._client.stream("POST", "/generate", json=payload) as response:
+                if stream:
+                    # Streaming mode: parse SSE events
+                    async with self._client.stream("POST", "/generate", json=payload) as response:
+                        response.raise_for_status()
+                        async for event in self._iter_sse_events(response):
+                            yield event
+                        return  # Success, exit retry loop
+                else:
+                    # Non-streaming mode: single JSON response (better for high concurrency)
+                    response = await self._client.post("/generate", json=payload)
                     response.raise_for_status()
-                    async for event in self._iter_sse_events(response):
-                        yield event
+                    # JSON decode - if it fails, exception propagates to retry logic
+                    output = response.json()
+                    yield output
                     return  # Success, exit retry loop
 
             except Exception as e:

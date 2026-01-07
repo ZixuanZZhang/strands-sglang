@@ -91,6 +91,7 @@ class SGLangModel(Model):
         params: dict[str, Any] | None  # Default sampling parameters
         timeout: float | None  # Request timeout in seconds, or None for infinite (default: None, like SLIME)
         return_logprobs: bool  # Return logprobs for all tokens (default: True)
+        stream: bool  # Stream responses (default: False for better parallelism in RL training)
 
     def __init__(
         self,
@@ -344,6 +345,7 @@ class SGLangModel(Model):
         config = self.get_config()
         sampling_params: dict[str, Any] = dict(config.get("params") or {})
         return_logprobs = config.get("return_logprobs", True)
+        use_streaming = config.get("stream", False)  # Default: non-streaming for better parallelism
         new_input_tokens = self.tokenize_prompt_messages(messages, system_prompt)
         # Tracking token IDs in token_manager to ensure the token-in feature
         input_ids = self.token_manager.token_ids + (new_input_tokens or [])
@@ -368,6 +370,7 @@ class SGLangModel(Model):
                 model=config.get("model_id"),
                 sampling_params=sampling_params,
                 return_logprob=return_logprobs,
+                stream=use_streaming,
             ):
                 new_text = event.get("text")
                 if isinstance(new_text, str):
