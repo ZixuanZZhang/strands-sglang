@@ -34,10 +34,18 @@ logger = logging.getLogger(__name__)
 # OpenAI's default connection limit (from openai/_constants.py)
 DEFAULT_MAX_CONNECTIONS = 1000
 
-# Non-retryable HTTP status codes (client errors that won't self-resolve)
-# Everything else is retried (aligned with SLIME's aggressive retry philosophy)
-# Note: 408 (Request Timeout) and 429 (Rate Limited) ARE retried (from OpenAI)
-NON_RETRYABLE_STATUS_CODES = {400, 401, 403, 404, 405, 406, 409, 410, 411, 412, 413, 414, 415, 422}
+# Non-retryable HTTP status codes
+#
+# Reference: OpenAI Python SDK (_base_client.py) retries: 408, 409, 429, 5xx
+# Reference: Slime (http_utils.py) retries ALL errors for local SGLang servers
+#
+# Our hybrid approach for local SGLang during RL training:
+# - 401/403/404: Don't retry (auth/routing errors won't self-resolve)
+# - 400 with context length error: Don't retry (prompt too long won't fix itself)
+# - 400 other: Retry (transient for local servers - weight reloading, memory pressure)
+# - 408/409/429/5xx: Retry (same as OpenAI SDK)
+# - Connection errors: Retry (same as OpenAI SDK)
+NON_RETRYABLE_STATUS_CODES = {401, 403, 404}  # Auth failed, forbidden, endpoint not found
 
 
 class SGLangClient:
@@ -153,16 +161,24 @@ class SGLangClient:
         """Check if an error is retryable.
 
         Aligned with SLIME's philosophy: retry aggressively on most errors.
-        Only non-retryable errors are client errors (4xx) that won't self-resolve.
+        For local SGLang servers, most 400 errors are transient (weight reloading, memory pressure).
 
-        From OpenAI: 408 (Request Timeout) and 429 (Rate Limited) ARE retried.
+        Non-retryable:
+        - 401/403/404: Auth/routing errors that won't self-resolve
+        - 400 with "context length exceeded": Prompt too long, retrying won't help
         """
         if isinstance(e, httpx.HTTPStatusError):
             status = e.response.status_code
-            # Don't retry non-recoverable client errors
+            # Don't retry auth/routing errors
             if status in NON_RETRYABLE_STATUS_CODES:
                 return False
-            # Retry everything else: 5xx, 408, 429, etc.
+            # Don't retry context length errors (retrying won't help)
+            if status == 400:
+                error_text = e.response.text.lower()
+                length_patterns = ["exceed", "too long", "max model len", "maximum length", "context length"]
+                if any(p in error_text for p in length_patterns):
+                    return False
+            # Retry everything else: 5xx, 408, 429, other 400s, etc.
             return True
         # Retry all connection/timeout errors
         return True
@@ -193,8 +209,8 @@ class SGLangClient:
             Response dict with text, output_ids, meta_info (logprobs, finish_reason, etc.).
 
         Raises:
-            httpx.HTTPStatusError: For non-retryable client errors (400, 401, 403, etc.)
-                or after all retries exhausted.
+            httpx.HTTPStatusError: For non-retryable errors (401, 403, 404, context length exceeded)
+                or after all retries exhausted. Other 400 errors are retried.
             httpx.ConnectError: For connection failures after retries exhausted.
         """
         payload: dict[str, Any] = {

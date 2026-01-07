@@ -26,6 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Message Formatting Methods**: Converted `_format_message_content` and `format_request_messages` to `@classmethod` since they don't use instance state. This clarifies intent and allows calling without an instance.
 
+- **SLIME-Aligned Retry for Local Servers**: Changed retry behavior to match SLIME's aggressive retry philosophy for local SGLang servers during RL training:
+  - 400 errors are now **retried** (can be transient during weight reloading, memory pressure)
+  - Only truly non-retryable: 401 (auth), 403 (forbidden), 404 (not found)
+  - 400 with context length patterns still not retried (won't help)
+  - References: [OpenAI Python SDK](https://github.com/openai/openai-python) retries 408/409/429/5xx; [SLIME](https://github.com/THUDM/slime) retries ALL errors
+
+- **Improved Context Length Detection**: Expanded patterns to detect context/prompt length errors in 400 responses:
+  - Now matches: "exceed", "too long", "max model len", "maximum length", "context length"
+  - These are converted to `ContextWindowOverflowException` (TRUNCATED, not ABORTED)
+  - Added logging for unexpected 400 errors to aid debugging
+
 ## [0.0.2] - 2026-01-07
 
 ### Added

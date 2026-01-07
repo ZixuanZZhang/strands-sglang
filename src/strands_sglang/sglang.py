@@ -395,13 +395,17 @@ class SGLangModel(Model):
 
         except httpx.HTTPStatusError as e:
             status = e.response.status_code
-            error_text = e.response.text
-            # Context length exceeded
-            if status == 400 and ("exceed" in error_text.lower() and "length" in error_text.lower()):
-                raise ContextWindowOverflowException(f"Context length exceeded: {error_text}") from e
+            error_text = e.response.text.lower()
+            # Context/prompt length exceeded (various SGLang error patterns)
+            if status == 400:
+                length_patterns = ["exceed", "too long", "max model len", "maximum length", "context length"]
+                if any(p in error_text for p in length_patterns):
+                    raise ContextWindowOverflowException(f"Context length exceeded: {e.response.text}") from e
+                # Log unexpected 400 errors for debugging
+                logger.warning(f"Unexpected 400 error: {e.response.text}")
             # Rate limiting / service unavailable
             if status in (429, 503):
-                raise ModelThrottledException(f"Service throttled (status={status}): {error_text}") from e
+                raise ModelThrottledException(f"Service throttled (status={status}): {e.response.text}") from e
             raise  # Re-raise other HTTP errors
         finally:
             if ephemeral_client:
