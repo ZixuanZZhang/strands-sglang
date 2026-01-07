@@ -104,8 +104,8 @@ class SGLangModel(Model):
         Args:
             tokenizer: HuggingFace tokenizer for chat template and tokenization.
             tool_call_parser: Parser for tool calls (default: HermesToolCallParser).
-            client: Optional SGLangClient for connection pooling and retry logic.
-                    If None, creates a new client per-request (not recommended for high concurrency).
+            client: Optional `SGLangClient` for connection pooling and retry logic.
+                    If `None`, creates a new ephemeral client per-request (not recommended for high concurrency like RL training).
             **model_config: See SGLangConfig for available options.
         """
         self.tokenizer = tokenizer
