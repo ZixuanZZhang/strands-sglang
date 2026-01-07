@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Qwen3 Hybrid Thinking Mode Support**: Added `enable_thinking` config option for Qwen3 hybrid thinking models. This is passed to `apply_chat_template` to control whether the model uses its internal reasoning mode with `<think>` tokens. Default is `None` (not passed to template) to avoid affecting non-Qwen3 models.
+
+  ```python
+  # For Qwen3 hybrid models: enable thinking mode
+  model = SGLangModel(tokenizer=tokenizer, enable_thinking=True)
+
+  # For Qwen3 hybrid models: disable thinking for faster non-reasoning tasks
+  model = SGLangModel(tokenizer=tokenizer, enable_thinking=False)
+
+  # For non-Qwen3 models: don't set (default None, parameter not passed)
+  model = SGLangModel(tokenizer=tokenizer)
+  ```
+
 ### Changed
 
 - **Message Formatting Methods**: Converted `_format_message_content` and `format_request_messages` to `@classmethod` since they don't use instance state. This clarifies intent and allows calling without an instance.

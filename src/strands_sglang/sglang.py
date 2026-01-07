@@ -91,6 +91,7 @@ class SGLangModel(Model):
         params: dict[str, Any] | None  # Default sampling parameters
         timeout: float | None  # Request timeout in seconds, or None for infinite (default: None, like SLIME)
         return_logprobs: bool  # Return logprobs for all tokens (default: True)
+        enable_thinking: bool | None  # Enable thinking mode for Qwen3 hybrid models (default: None = auto)
 
     def __init__(
         self,
@@ -118,6 +119,10 @@ class SGLangModel(Model):
         self._client = client
         self._base_url = base_url
         self._timeout = timeout
+
+        # Thinking mode for Qwen3 hybrid models (default: None = don't pass, let template decide)
+        # Set explicitly to True/False only for models that support enable_thinking parameter
+        self._enable_thinking: bool | None = model_config.get("enable_thinking")
 
         # Store config
         self.config = dict(model_config)
@@ -233,11 +238,22 @@ class SGLangModel(Model):
         Applies the HuggingFace chat template with `add_generation_prompt=True`,
         which appends the assistant turn prefix for the model to continue.
 
+        For Qwen3 hybrid thinking models, `enable_thinking` controls whether
+        the model uses its internal reasoning mode. Only passed to template
+        when explicitly set (not None) to avoid affecting non-Qwen3 models.
+
         The result is manually tokenized (not model-generated) and added to
         the TITO trajectory with `loss_mask=False`.
         """
         chat_messages = self.format_request_messages(messages, system_prompt)
-        kwargs: dict[str, Any] = {"tokenize": False, "add_generation_prompt": True}
+        kwargs: dict[str, Any] = {
+            "tokenize": False,
+            "add_generation_prompt": True,
+        }
+        # Only pass enable_thinking if explicitly set (for Qwen3 hybrid models)
+        # This avoids affecting non-Qwen3 models that don't support this parameter
+        if self._enable_thinking is not None:
+            kwargs["enable_thinking"] = self._enable_thinking
         if tools:
             kwargs["tools"] = tools
         return self.tokenizer.apply_chat_template(chat_messages, **kwargs)
