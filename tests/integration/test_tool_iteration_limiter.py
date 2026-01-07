@@ -170,8 +170,8 @@ class TestToolIterationLimiterBasic:
 class TestToolIterationLimiterTrajectory:
     """Tests for trajectory cleanliness after limiter stops."""
 
-    async def test_iteration_count_matches_tool_messages(self, fresh_model):
-        """Limiter iteration count should match tool messages in trajectory."""
+    async def test_iteration_count_le_tool_messages(self, fresh_model):
+        """Limiter iteration count should be <= tool messages (parallel calls = 1 iteration)."""
         limiter = ToolIterationLimiter(max_iterations=2)
         agent = Agent(
             model=fresh_model,
@@ -192,11 +192,14 @@ class TestToolIterationLimiterTrajectory:
         # Count tool messages in trajectory
         tool_message_count = sum(1 for msg in trajectory if msg["role"] == "tool")
 
-        # Iteration count should match tool message count
-        assert limiter.iteration_count == tool_message_count, (
-            f"Mismatch: limiter.iteration_count={limiter.iteration_count}, "
-            f"tool_message_count={tool_message_count}"
+        # Iteration count <= tool message count because parallel tool calls
+        # in a single response count as 1 iteration but produce N tool messages
+        assert limiter.iteration_count <= tool_message_count, (
+            f"iteration_count ({limiter.iteration_count}) should be <= "
+            f"tool_message_count ({tool_message_count})"
         )
+        assert limiter.iteration_count > 0, "Should have at least one iteration"
+        assert tool_message_count > 0, "Should have at least one tool message"
 
     async def test_iteration_count_matches_tool_messages_on_completion(self, fresh_model):
         """Iteration count matches tool messages when agent completes normally."""
