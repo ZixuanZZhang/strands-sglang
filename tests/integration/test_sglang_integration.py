@@ -189,23 +189,33 @@ class TestTITO:
         assert second_prompt_len < first_prompt_len + second_prompt_len
 
 
-class TestSSEParsing:
-    """Tests for SSE event parsing via SGLangClient."""
+class TestClientGenerate:
+    """Tests for SGLangClient.generate() non-streaming API."""
 
-    async def test_client_generate_parses_sse(self, model):
-        """SGLangClient.generate() correctly parses SSE stream."""
+    async def test_client_generate_returns_complete_response(self, model):
+        """SGLangClient.generate() returns complete JSON response."""
         messages = [{"role": "user", "content": [{"text": "Say 'test'"}]}]
 
         # Tokenize and call client.generate() directly
         input_ids = model.tokenize_prompt_messages(messages, system_prompt=None)
         client = model._get_client()
 
+        result = await client.generate(input_ids=input_ids)
+
+        # Should return a dict with complete response data
+        assert isinstance(result, dict)
+        assert "text" in result
+        assert "output_ids" in result
+        assert "meta_info" in result
+
+    async def test_model_stream_emits_strands_events(self, model):
+        """SGLangModel.stream() emits strands stream events."""
+        messages = [{"role": "user", "content": [{"text": "Say 'hello'"}]}]
         events = []
-        async for event in client.generate(input_ids=input_ids):
+        async for event in model.stream(messages):
             events.append(event)
 
-        # Should have parsed JSON events with expected fields
-        assert len(events) > 0
-        assert all(isinstance(e, dict) for e in events)
-        # Final event should have output_ids
-        assert "output_ids" in events[-1] or "text" in events[-1]
+        # Should emit strands stream events (messageStart, contentBlockDelta, etc.)
+        assert any("messageStart" in e for e in events)
+        assert any("contentBlockDelta" in e for e in events)
+        assert any("messageStop" in e for e in events)
