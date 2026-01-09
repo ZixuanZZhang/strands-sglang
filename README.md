@@ -17,7 +17,7 @@ SGLang model provider for [Strands Agents SDK](https://github.com/strands-agents
 ## Requirements
 
 - Python 3.10+
-- Strands Agents SDK 1.7.0+
+- Strands Agents SDK
 - SGLang server running with your model
 - HuggingFace tokenizer for the model
 
