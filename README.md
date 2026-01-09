@@ -169,6 +169,10 @@ docs: update TITO usage examples
 
 Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
 
+## Related Projects
+
+- [strands-vllm](https://github.com/agents-community/strands-vllm) - Community vLLM provider for Strands Agents SDK
+
 ## License
 
 Apache License 2.0 - see [LICENSE](LICENSE).
