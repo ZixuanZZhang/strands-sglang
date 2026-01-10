@@ -14,9 +14,9 @@
 
 """SGLang HTTP client with connection pooling and retry logic.
 
-Aligned with SLIME's http_utils.py for RL training stability:
+Aligned with Slime's http_utils.py for RL training stability:
 - Aggressive retry (60 attempts by default)
-- Retries on all transient errors (like SLIME)
+- Retries on all transient errors (like Slime)
 - Infinite timeout by default for long generations
 - Non-streaming POST for better parallelism (no SSE overhead)
 """
@@ -52,7 +52,7 @@ class SGLangClient:
     """Async HTTP client for SGLang server with connection pooling and retry.
 
     Designed for RL training stability with aggressive retry on transient errors.
-    Aligned with SLIME's http_utils.py approach.
+    Aligned with Slime's http_utils.py approach.
 
     Uses non-streaming POST requests for better parallelism in high-concurrency
     training scenarios (no SSE overhead, connections released immediately).
@@ -62,10 +62,10 @@ class SGLangClient:
         ...     result = await client.generate(input_ids=[1, 2, 3])
         ...     print(result["text"])
 
-        >>> # For RL training with infinite timeout (like SLIME):
+        >>> # For RL training with infinite timeout (like Slime):
         >>> client = SGLangClient("http://localhost:30000", timeout=None)
 
-        >>> # From SLIME training args:
+        >>> # From Slime training args:
         >>> client = SGLangClient.from_slime_args(args)
     """
 
@@ -84,16 +84,16 @@ class SGLangClient:
         Args:
             base_url: SGLang server URL (e.g., "http://localhost:30000").
             max_connections: Maximum concurrent connections (default: 1000).
-            timeout: Request timeout in seconds, or None for infinite (default: None, like SLIME).
+            timeout: Request timeout in seconds, or None for infinite (default: None, like Slime).
             connect_timeout: TCP connection timeout in seconds (default: 5s).
-            max_retries: Maximum retry attempts on transient errors (default: 60, like SLIME).
+            max_retries: Maximum retry attempts on transient errors (default: 60, like Slime).
             retry_delay: Delay between retries in seconds (default: 1.0).
         """
         self.base_url = base_url.rstrip("/")
         self.max_retries = max_retries
         self.retry_delay = retry_delay
 
-        # timeout=None means infinite wait (like SLIME's httpx.Timeout(None))
+        # timeout=None means infinite wait (like Slime's httpx.Timeout(None))
         http_timeout = httpx.Timeout(timeout, connect=connect_timeout) if timeout else httpx.Timeout(None)
 
         # FIX: Set max_keepalive_connections equal to max_connections to avoid connection churn
@@ -160,7 +160,7 @@ class SGLangClient:
     def _is_retryable_error(self, e: Exception) -> bool:
         """Check if an error is retryable.
 
-        Aligned with SLIME's philosophy: retry aggressively on most errors.
+        Aligned with Slime's philosophy: retry aggressively on most errors.
         For local SGLang servers, most 400 errors are transient (weight reloading, memory pressure).
 
         Non-retryable:
