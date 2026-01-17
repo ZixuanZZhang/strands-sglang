@@ -77,7 +77,7 @@ asyncio.run(main())
 
 ## Slime Training
 
-For RL training with [Slime](https://github.com/THUDM/slime/), `SGLangModel` with TITO eliminates the retokenization step in [`generate_with_strands.py`](https://github.com/THUDM/slime/blob/main/examples/strands-agents/generate_with_strands.py) (this example is not fully ready yet):
+For RL training with [slime](https://github.com/THUDM/slime/), `SGLangModel` with TITO eliminates the retokenization step, see an concrete example at [slime/examples/strands_sglang](https://github.com/THUDM/slime/tree/main/examples/strands_sglang):
 
 ```python
 from strands import Agent, tool
