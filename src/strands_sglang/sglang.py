@@ -134,7 +134,7 @@ class SGLangModel(Model):
         self._current_tools: list[dict] | None = None
 
         # Parse error tracking (per tool name)
-        self._parse_errors: dict[str, int] = {}
+        self.tool_parse_errors: dict[str, int] = {}
 
         logger.debug(f"initialized with config: {self.config}")
 
@@ -154,7 +154,7 @@ class SGLangModel(Model):
         self.token_manager.reset()
         self._processed_message_count = 0
         self._current_tools = None
-        self._parse_errors = {}
+        self.tool_parse_errors = {}
 
     # -------------------------------------------------------------------------
     # Model interface implementation
@@ -315,7 +315,7 @@ class SGLangModel(Model):
             if tool_call.is_error:
                 logger.warning(f"Tool parse error for '{tool_call.name}': {(tool_call.raw or '')[:100]}")
                 # Track parse error count per tool name
-                self._parse_errors[tool_call.name] = self._parse_errors.get(tool_call.name, 0) + 1
+                self.tool_parse_errors[tool_call.name] = self.tool_parse_errors.get(tool_call.name, 0) + 1
 
             yield {
                 "contentBlockStart": {
