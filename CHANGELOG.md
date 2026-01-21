@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-01-20
+
+First beta release. The library is now considered stable for production use in agentic RL training.
+
+### Added
+
+- **Tool Parse Error Tracking**: `SGLangModel` now tracks tool call parse errors via the `tool_parse_errors` attribute. This enables distinguishing between parse errors (malformed JSON, missing tool name) and execution errors (tool threw exception) during RL training metrics collection.
+
+  ```python
+  model = SGLangModel(tokenizer=tokenizer)
+  # After generation:
+  print(model.tool_parse_errors)  # {"tool_name": count, ...}
+  ```
+
+### Changed
+
+- **Beta Status**: Upgraded from Alpha to Beta. The API is now stable and suitable for production RL training workloads.
+
 ## [0.0.3] - 2026-01-08
 
 ### Added

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "strands-sglang"
-version = "0.0.4.dev0"
+version = "0.1.0"
 description = "SGLang model provider for Strands Agents SDK with Token-In/Token-Out (TITO) support for agentic RL training."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,7 +14,7 @@ authors = [
 ]
 keywords = ["strands", "agents", "sglang", "llm", "ai", "reinforcement-learning", "rl", "agentic-rl"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
