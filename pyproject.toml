@@ -30,6 +30,7 @@ dependencies = [
     "httpx",
     "transformers",
     "openai",
+    "jinja2",
 ]
 
 [project.urls]
