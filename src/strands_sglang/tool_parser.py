@@ -137,6 +137,12 @@ class HermesToolCallParser(ToolCallParser):
 
     Only handles JSONDecodeError; Strands validates arguments against tool schemas.
 
+    Think Block Handling:
+        Models with reasoning capabilities (Qwen3 with thinking, DeepSeek-R1, etc.)
+        may output draft tool calls inside <think>...</think> blocks. These are
+        excluded by default to avoid executing planning/reasoning tool calls.
+        Set think_start_token=None to disable this behavior.
+
     Chat Template Notes:
         Qwen3's chat template uses newline as separator between messages:
         `<|im_start|>role\\ncontent<|im_end|>\\n<|im_start|>...`
@@ -145,29 +151,50 @@ class HermesToolCallParser(ToolCallParser):
     Attributes:
         bot_token: Opening tag for tool calls (default: "<tool_call>").
         eot_token: Closing tag for tool calls (default: "</tool_call>").
+        think_start_token: Opening tag for think blocks (default: "<think>").
+        think_end_token: Closing tag for think blocks (default: "</think>").
     """
 
     DEFAULT_BOT_TOKEN = "<tool_call>"  # tool call start tag
     DEFAULT_EOT_TOKEN = "</tool_call>"  # tool call end tag
+    DEFAULT_THINK_START_TOKEN = "<think>"  # think block start tag
+    DEFAULT_THINK_END_TOKEN = "</think>"  # think block end tag
     _NAME_PATTERN = re.compile(r'"name"\s*:\s*"([^"]+)"')  # tool call name regex
 
     def __init__(
         self,
         bot_token: str = DEFAULT_BOT_TOKEN,
         eot_token: str = DEFAULT_EOT_TOKEN,
+        think_start_token: str | None = DEFAULT_THINK_START_TOKEN,
+        think_end_token: str | None = DEFAULT_THINK_END_TOKEN,
     ) -> None:
         """Initialize the parser with optional custom tokens.
 
         Args:
             bot_token: Custom opening tag (default: "<tool_call>").
             eot_token: Custom closing tag (default: "</tool_call>").
+            think_start_token: Opening tag for think blocks to exclude (default: "<think>").
+                Set to None to disable think block exclusion.
+            think_end_token: Closing tag for think blocks to exclude (default: "</think>").
         """
         self.bot_token = bot_token
         self.eot_token = eot_token
+        self.think_start_token = think_start_token
+        self.think_end_token = think_end_token
+
         self._pattern = re.compile(
             rf"{re.escape(self.bot_token)}\s*(.*?)\s*{re.escape(self.eot_token)}",
             re.DOTALL,
         )
+
+        # Pattern to remove think blocks (if configured)
+        if think_start_token and think_end_token:
+            self._think_pattern: re.Pattern[str] | None = re.compile(
+                rf"{re.escape(think_start_token)}.*?{re.escape(think_end_token)}",
+                re.DOTALL,
+            )
+        else:
+            self._think_pattern = None
 
     @property
     def message_separator(self) -> str:
@@ -190,6 +217,10 @@ class HermesToolCallParser(ToolCallParser):
         Returns:
             List of tool call results (successful and errors).
         """
+        # Remove think blocks to avoid parsing draft tool calls from reasoning
+        if self._think_pattern:
+            text = self._think_pattern.sub("", text)
+
         tool_calls: list[ToolCallParseResult] = []
 
         for match in self._pattern.finditer(text):

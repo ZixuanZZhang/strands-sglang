@@ -399,3 +399,124 @@ class TestHermesToolCallParser:
         assert results[0].id != results[1].id
         assert results[0].id.startswith("call_")
         assert results[1].id.startswith("call_")
+
+    # --- Think Block Exclusion ---
+
+    def test_exclude_tool_calls_inside_think_block(self, parser):
+        """Tool calls inside <think> blocks are excluded."""
+        text = """
+        <think>
+        Let me think about this...
+        Maybe I should call <tool_call>{"name": "draft_tool", "arguments": {"x": 1}}</tool_call>
+        No, let me reconsider...
+        </think>
+        <tool_call>{"name": "actual_tool", "arguments": {"y": 2}}</tool_call>
+        """
+        results = parser.parse(text)
+
+        assert len(results) == 1
+        assert results[0].name == "actual_tool"
+        assert results[0].input == {"y": 2}
+
+    def test_exclude_multiple_think_blocks(self, parser):
+        """Multiple <think> blocks are all excluded."""
+        text = """
+        <think>Draft 1: <tool_call>{"name": "draft1", "arguments": {}}</tool_call></think>
+        <tool_call>{"name": "real1", "arguments": {}}</tool_call>
+        <think>Draft 2: <tool_call>{"name": "draft2", "arguments": {}}</tool_call></think>
+        <tool_call>{"name": "real2", "arguments": {}}</tool_call>
+        """
+        results = parser.parse(text)
+
+        assert len(results) == 2
+        assert results[0].name == "real1"
+        assert results[1].name == "real2"
+
+    def test_think_block_with_no_tool_calls(self, parser):
+        """Think block without tool calls doesn't affect parsing."""
+        text = """
+        <think>Just some reasoning without tool calls...</think>
+        <tool_call>{"name": "my_tool", "arguments": {}}</tool_call>
+        """
+        results = parser.parse(text)
+
+        assert len(results) == 1
+        assert results[0].name == "my_tool"
+
+    def test_no_think_blocks(self, parser):
+        """Parsing works normally when no think blocks present."""
+        text = '<tool_call>{"name": "tool", "arguments": {}}</tool_call>'
+        results = parser.parse(text)
+
+        assert len(results) == 1
+        assert results[0].name == "tool"
+
+    def test_disable_think_block_exclusion(self):
+        """Setting think_start_token=None disables exclusion."""
+        parser = HermesToolCallParser(think_start_token=None)
+        text = """
+        <think>
+        <tool_call>{"name": "inside_think", "arguments": {}}</tool_call>
+        </think>
+        <tool_call>{"name": "outside_think", "arguments": {}}</tool_call>
+        """
+        results = parser.parse(text)
+
+        # Both should be parsed when exclusion is disabled
+        assert len(results) == 2
+        assert results[0].name == "inside_think"
+        assert results[1].name == "outside_think"
+
+    def test_custom_think_tokens(self):
+        """Custom think tokens work correctly."""
+        parser = HermesToolCallParser(
+            think_start_token="<reasoning>",
+            think_end_token="</reasoning>",
+        )
+        text = """
+        <reasoning>
+        <tool_call>{"name": "draft", "arguments": {}}</tool_call>
+        </reasoning>
+        <tool_call>{"name": "actual", "arguments": {}}</tool_call>
+        """
+        results = parser.parse(text)
+
+        assert len(results) == 1
+        assert results[0].name == "actual"
+
+    def test_custom_think_tokens_ignore_default(self):
+        """Custom think tokens don't exclude default <think> blocks."""
+        parser = HermesToolCallParser(
+            think_start_token="<reasoning>",
+            think_end_token="</reasoning>",
+        )
+        text = """
+        <think>
+        <tool_call>{"name": "in_think", "arguments": {}}</tool_call>
+        </think>
+        <tool_call>{"name": "outside", "arguments": {}}</tool_call>
+        """
+        results = parser.parse(text)
+
+        # <think> is NOT excluded with custom tokens, so both are parsed
+        assert len(results) == 2
+        assert results[0].name == "in_think"
+        assert results[1].name == "outside"
+
+    def test_multiline_think_block(self, parser):
+        """Multiline think blocks are properly excluded."""
+        text = """<think>
+This is a long reasoning block
+that spans multiple lines.
+
+Let me consider calling:
+<tool_call>{"name": "considered_tool", "arguments": {"query": "test"}}</tool_call>
+
+Actually, I should use a different approach.
+</think>
+<tool_call>{"name": "final_tool", "arguments": {"query": "real"}}</tool_call>"""
+        results = parser.parse(text)
+
+        assert len(results) == 1
+        assert results[0].name == "final_tool"
+        assert results[0].input == {"query": "real"}
