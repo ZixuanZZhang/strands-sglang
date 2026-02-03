@@ -27,7 +27,7 @@ class TestSGLangClientInit:
 
     def test_default_config(self):
         """Default configuration values."""
-        client = SGLangClient("http://localhost:30000")
+        client = SGLangClient(base_url="http://localhost:30000")
 
         assert client.base_url == "http://localhost:30000"
         assert client.max_retries == 60
@@ -35,13 +35,13 @@ class TestSGLangClientInit:
 
     def test_base_url_strips_trailing_slash(self):
         """Base URL trailing slash is stripped."""
-        client = SGLangClient("http://localhost:30000/")
+        client = SGLangClient(base_url="http://localhost:30000/")
         assert client.base_url == "http://localhost:30000"
 
     def test_custom_config(self):
         """Custom configuration is applied."""
         client = SGLangClient(
-            "http://custom:9000",
+            base_url="http://custom:9000",
             max_connections=500,
             timeout=120.0,
             max_retries=10,
@@ -107,7 +107,7 @@ class TestRetryableErrors:
 
     @pytest.fixture
     def client(self):
-        return SGLangClient("http://localhost:30000")
+        return SGLangClient(base_url="http://localhost:30000")
 
     # --- Connection errors (always retryable) ---
 
@@ -179,7 +179,7 @@ class TestHealth:
             mock_response.status_code = 200
             mock_get.return_value = mock_response
 
-            client = SGLangClient("http://localhost:30000")
+            client = SGLangClient(base_url="http://localhost:30000")
             result = await client.health()
 
             assert result is True
@@ -190,7 +190,7 @@ class TestHealth:
         with patch.object(httpx.AsyncClient, "get") as mock_get:
             mock_get.side_effect = httpx.ConnectError("Connection refused")
 
-            client = SGLangClient("http://localhost:30000")
+            client = SGLangClient(base_url="http://localhost:30000")
             result = await client.health()
 
             assert result is False

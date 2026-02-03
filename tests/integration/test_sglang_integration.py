@@ -18,6 +18,8 @@ Tests low-level SGLangModel streaming and TITO functionality.
 Fixtures (model, tokenizer, calculator_tool) are provided by conftest.py.
 """
 
+from strands_sglang.client import SGLangClient
+
 
 class TestStreamBasic:
     """Basic streaming tests."""
@@ -198,7 +200,7 @@ class TestClientGenerate:
 
         # Tokenize and call client.generate() directly
         input_ids = model.tokenize_prompt_messages(messages, system_prompt=None)
-        client = model._get_client()
+        client = model.client
 
         result = await client.generate(input_ids=input_ids)
 
@@ -228,9 +230,10 @@ class TestEnableThinking:
         """With enable_thinking=True, Qwen3 should generate <think> content."""
         from strands_sglang import SGLangModel
 
+        client = SGLangClient(base_url=sglang_base_url)
         model = SGLangModel(
             tokenizer=tokenizer,
-            base_url=sglang_base_url,
+            client=client,
             enable_thinking=True,
             params={"max_new_tokens": 1024, "temperature": 0.7},
         )
@@ -252,9 +255,10 @@ class TestEnableThinking:
         """With enable_thinking=False, Qwen3 should have minimal/empty <think> content."""
         from strands_sglang import SGLangModel
 
+        client = SGLangClient(base_url=sglang_base_url)
         model = SGLangModel(
             tokenizer=tokenizer,
-            base_url=sglang_base_url,
+            client=client,
             enable_thinking=False,
             params={"max_new_tokens": 512, "temperature": 0.7},
         )
@@ -284,9 +288,10 @@ class TestEnableThinking:
         from strands_sglang import SGLangModel
 
         # Default behavior - enable_thinking not set
+        client = SGLangClient(base_url=sglang_base_url)
         model = SGLangModel(
             tokenizer=tokenizer,
-            base_url=sglang_base_url,
+            client=client,
             params={"max_new_tokens": 256, "temperature": 0.7},
         )
 

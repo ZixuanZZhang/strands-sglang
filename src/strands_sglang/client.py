@@ -58,12 +58,12 @@ class SGLangClient:
     training scenarios (no SSE overhead, connections released immediately).
 
     Example:
-        >>> async with SGLangClient("http://localhost:30000") as client:
+        >>> async with SGLangClient(base_url="http://localhost:30000") as client:
         ...     result = await client.generate(input_ids=[1, 2, 3])
         ...     print(result["text"])
 
         >>> # For RL training with infinite timeout (like Slime):
-        >>> client = SGLangClient("http://localhost:30000", timeout=None)
+        >>> client = SGLangClient(base_url="http://localhost:30000", timeout=None)
 
         >>> # From Slime training args:
         >>> client = SGLangClient.from_slime_args(args)
@@ -139,7 +139,7 @@ class SGLangClient:
             >>> model = SGLangModel(tokenizer=tokenizer, client=client)
         """
         return cls(
-            f"http://{args.sglang_router_ip}:{args.sglang_router_port}",
+            base_url=f"http://{args.sglang_router_ip}:{args.sglang_router_port}",
             # Matches Slime's init_http_client formula
             max_connections=args.sglang_server_concurrency * args.rollout_num_gpus // args.rollout_num_gpus_per_engine,
             **overrides,

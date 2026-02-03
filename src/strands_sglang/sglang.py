@@ -63,20 +63,23 @@ logger = logging.getLogger(__name__)
 
 
 class SGLangModel(Model):
-    """SGLang native `/generate` API provider with token-in/token-out (TITO) support.
+    """SGLang native `/generate` API provider with token-in/token-out support.
 
     Uses a HuggingFace tokenizer for chat template formatting and SGLang's
     `/generate` endpoint for generation. Tracks token trajectories via `TokenManager`.
 
     Attributes:
         tokenizer: HuggingFace tokenizer for encoding/decoding.
-        token_manager: Tracks tokens, logprobs, and masks for TITO training.
+        client: SGLangClient for HTTP communication with the SGLang server.
+        token_manager: Tracks tokens, logprobs, and masks for on-policy training.
         tool_call_parser: Parser for extracting tool calls from model output.
 
     Example:
         >>> from transformers import AutoTokenizer
+        >>> from strands_sglang import SGLangClient, SGLangModel
         >>> tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-4B-Thinking-2507")
-        >>> model = SGLangModel(tokenizer=tokenizer, base_url="http://localhost:30000")
+        >>> client = SGLangClient(base_url="http://localhost:30000")
+        >>> model = SGLangModel(tokenizer=tokenizer, client=client)
         >>> # After generation:
         >>> model.token_manager.token_ids    # Full token trajectory
         >>> model.token_manager.loss_mask    # Boolean mask for loss computation
@@ -86,64 +89,44 @@ class SGLangModel(Model):
     class SGLangConfig(TypedDict, total=False):
         """Configuration options for SGLang native API."""
 
-        base_url: str  # SGLang server URL (default: http://localhost:30000)
         model_id: str | None  # Optional model identifier
         params: dict[str, Any] | None  # Default sampling parameters
-        timeout: float | None  # Request timeout in seconds, or None for infinite (default: None, like SLIME)
         return_logprobs: bool  # Return logprobs for all tokens (default: True)
         enable_thinking: bool | None  # Enable thinking mode for Qwen3 hybrid models (default: None = auto)
 
     def __init__(
         self,
+        *,
         tokenizer: PreTrainedTokenizerBase,
+        client: SGLangClient,
         tool_call_parser: ToolCallParser | None = None,
-        client: SGLangClient | None = None,
         **model_config: Unpack[SGLangConfig],
     ) -> None:
         """Initialize SGLang model provider.
 
         Args:
             tokenizer: HuggingFace tokenizer for chat template and tokenization.
+            client: SGLangClient for HTTP communication with the SGLang server.
             tool_call_parser: Parser for tool calls (default: HermesToolCallParser).
-            client: Optional `SGLangClient` for connection pooling and retry logic.
-                    If `None`, creates a new ephemeral client per-request (not recommended for high concurrency like RL training).
             **model_config: See SGLangConfig for available options.
         """
+
+        # Essential attributes
         self.tokenizer = tokenizer
+        self.client = client
         self.tool_call_parser = tool_call_parser or HermesToolCallParser()
 
-        # HTTP client setup
-        base_url = str(model_config.get("base_url") or "http://localhost:30000").rstrip("/")
-        timeout = model_config.get("timeout")  # None = infinite, like SLIME
-
-        self._client = client
-        self._base_url = base_url
-        self._timeout = timeout
-
-        # Thinking mode for Qwen3 hybrid models (default: None = don't pass, let template decide)
-        # Set explicitly to True/False only for models that support enable_thinking parameter
-        self._enable_thinking: bool | None = model_config.get("enable_thinking")
-
-        # Store config
+        # Config
         self.config = dict(model_config)
-        self.config["base_url"] = base_url
+        self._enable_thinking: bool | None = model_config.get("enable_thinking")  # Used for Qwen3 hybrid models
 
-        # TITO state
+        # State tracking (this makes SGLangModel stateful)
         self.token_manager = TokenManager()
         self._processed_message_count: int = 0
         self._current_tools: list[dict] | None = None
-
-        # Parse error tracking (per tool name)
-        self.tool_parse_errors: dict[str, int] = {}
+        self.tool_parse_errors: dict[str, int] = {}  # per-tool parse error count
 
         logger.debug(f"initialized with config: {self.config}")
-
-    def _get_client(self) -> SGLangClient:
-        """Get SGLangClient - shared if provided, otherwise create new."""
-        if self._client is not None:
-            return self._client
-        # Create per-request client (not ideal for high concurrency)
-        return SGLangClient(self._base_url, timeout=self._timeout)
 
     def reset(self) -> None:
         """Reset token accumulation for a new episode.
@@ -167,8 +150,6 @@ class SGLangModel(Model):
         Args:
             **model_config: Configuration overrides.
         """
-        if "base_url" in model_config and model_config["base_url"]:
-            self.config["base_url"] = str(model_config["base_url"]).rstrip("/")
         self.config.update(model_config)
 
     @override
@@ -189,7 +170,7 @@ class SGLangModel(Model):
         """Format a single message's content for chat templates.
 
         Flattens content arrays and preserves raw content including tool call
-        markup to maintain exact generation order for TITO reconstruction.
+        markup to maintain exact generation order for token-in/token-out reconstruction.
         Modifies the message in-place.
         """
         # Flatten content from [{"text": "..."}, ...] to "..."
@@ -250,7 +231,7 @@ class SGLangModel(Model):
         when explicitly set (not None) to avoid affecting non-Qwen3 models.
 
         The result is manually tokenized (not model-generated) and added to
-        the TITO trajectory with `loss_mask=False`.
+        the token trajectory with `loss_mask=False`.
         """
         chat_messages = self.format_request_messages(messages, system_prompt)
         kwargs: dict[str, Any] = {
@@ -377,7 +358,7 @@ class SGLangModel(Model):
         """Stream generation from SGLang /generate endpoint.
 
         Tokenizes messages, calls /generate, streams text deltas, and updates
-        the TITO trajectory with input/output tokens and logprobs.
+        the token trajectory with input/output tokens and logprobs.
         """
         # Format tools (only on first call)
         if tool_specs and not self._current_tools:
@@ -397,11 +378,8 @@ class SGLangModel(Model):
         yield {"contentBlockStart": {"start": {}}}
 
         # Call SGLangClient (non-streaming POST for better parallelism)
-        client = self._get_client()
-        ephemeral_client = self._client is None  # Ephemeral clients are closed after use
-
         try:
-            response = await client.generate(
+            response = await self.client.generate(
                 input_ids=input_ids,
                 model=config.get("model_id"),
                 sampling_params=sampling_params,
@@ -433,11 +411,8 @@ class SGLangModel(Model):
             if status in (429, 503):
                 raise ModelThrottledException(f"Service throttled (status={status}): {e.response.text}") from e
             raise  # Re-raise other HTTP errors
-        finally:
-            if ephemeral_client:
-                await client.close()
 
-        # Update TITO trajectory
+        # Update token trajectory
         if new_input_tokens:
             new_input_logprobs = input_logprobs[-len(new_input_tokens) :] if input_logprobs else None
             self.token_manager.add_prompt(token_ids=new_input_tokens, logprobs=new_input_logprobs)

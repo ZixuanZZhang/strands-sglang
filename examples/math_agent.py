@@ -23,6 +23,7 @@ from strands_tools import calculator
 from transformers import AutoTokenizer
 
 from strands_sglang import SGLangModel
+from strands_sglang.client import SGLangClient
 from strands_sglang.tool_parser import HermesToolCallParser
 
 
@@ -39,10 +40,11 @@ async def main():
     tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
 
     # Create SGLangModel with TITO support
+    client = SGLangClient(base_url=base_url)
     model = SGLangModel(
         tokenizer=tokenizer,
+        client=client,
         tool_call_parser=HermesToolCallParser(),
-        base_url=base_url,
         model_id=model_id,
         params={"max_new_tokens": 16384},  # Limit response length
     )

@@ -13,8 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING: `SGLangModel` requires `client` parameter**: `SGLangModel` now takes a required `client: SGLangClient` instead of `base_url`/`timeout` config. Ephemeral client creation is removed. All parameters are keyword-only.
+- **BREAKING: `SGLangConfig` no longer contains `base_url` or `timeout`**: These belong to `SGLangClient`. `SGLangConfig` now only has `model_id`, `params`, `return_logprobs`, and `enable_thinking`.
+- **BREAKING: `SGLangClient` `base_url` is keyword-only**: `SGLangClient(base_url="http://...")` instead of positional.
+- **`SGLangModel.client` is a public attribute**: Stored as `self.client` (previously `self._client`).
 - **`TokenManager.add_response()` guard**: Raises `RuntimeError` if called before any `add_prompt()`, enforcing that the first segment is always a prompt.
 - **`TokenManager.segments`**: No longer returns defensive copies; returns internal segment lists directly.
+
+### Removed
+
+- **`SGLangModel._get_client()`**: Removed along with ephemeral client creation/cleanup logic.
 
 ## [0.1.1] - 2026-01-26
 

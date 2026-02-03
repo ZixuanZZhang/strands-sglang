@@ -26,6 +26,7 @@ import pytest
 from transformers import AutoTokenizer
 
 from strands_sglang import SGLangModel
+from strands_sglang.client import SGLangClient
 from strands_sglang.tool_parser import HermesToolCallParser
 
 # Mark all tests in this directory as integration tests
@@ -53,10 +54,11 @@ def tokenizer(sglang_model_id):
 @pytest.fixture
 def model(tokenizer, sglang_base_url, sglang_model_id):
     """Create fresh SGLangModel for each test (perfect isolation)."""
+    client = SGLangClient(base_url=sglang_base_url)
     return SGLangModel(
         tokenizer=tokenizer,
+        client=client,
         tool_call_parser=HermesToolCallParser(),
-        base_url=sglang_base_url,
         model_id=sglang_model_id,
         params={"max_new_tokens": 32768},
     )

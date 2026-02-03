@@ -19,6 +19,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from strands_sglang import SGLangModel
+from strands_sglang.client import SGLangClient
 from strands_sglang.tool_parser import ToolCallParseResult
 
 
@@ -35,7 +36,8 @@ def mock_tokenizer():
 @pytest.fixture
 def model(mock_tokenizer):
     """Create an SGLangModel with mock tokenizer."""
-    return SGLangModel(tokenizer=mock_tokenizer)
+    client = SGLangClient(base_url="http://localhost:30000")
+    return SGLangModel(tokenizer=mock_tokenizer, client=client)
 
 
 class TestFormatTools:
@@ -292,36 +294,50 @@ class TestConfig:
     """Tests for configuration methods."""
 
     def test_default_config(self, mock_tokenizer):
-        """Default configuration values."""
-        model = SGLangModel(tokenizer=mock_tokenizer)
+        """Default configuration has no base_url or timeout (those belong to SGLangClient)."""
+        client = SGLangClient(base_url="http://localhost:30000")
+        model = SGLangModel(tokenizer=mock_tokenizer, client=client)
         config = model.get_config()
 
-        assert config["base_url"] == "http://localhost:30000"
-
-    def test_custom_base_url(self, mock_tokenizer):
-        """Custom base URL is stored correctly."""
-        model = SGLangModel(tokenizer=mock_tokenizer, base_url="http://custom:9000/")
-        config = model.get_config()
-
-        assert config["base_url"] == "http://custom:9000"
+        assert "base_url" not in config
+        assert "timeout" not in config
 
     def test_update_config(self, model):
         """Update configuration."""
-        model.update_config(base_url="http://new:8080", model_id="new-model")
+        model.update_config(model_id="new-model")
         config = model.get_config()
 
-        assert config["base_url"] == "http://new:8080"
         assert config["model_id"] == "new-model"
 
-    def test_config_with_timeout_float(self, mock_tokenizer):
-        """Configuration with custom timeout."""
-        model = SGLangModel(tokenizer=mock_tokenizer, timeout=300.0)
-        assert model._timeout == 300.0
+    def test_config_with_model_id(self, mock_tokenizer):
+        """Configuration with custom model_id."""
+        client = SGLangClient(base_url="http://localhost:30000")
+        model = SGLangModel(tokenizer=mock_tokenizer, client=client, model_id="my-model")
+        config = model.get_config()
 
-    def test_config_with_default_timeout(self, mock_tokenizer):
-        """Configuration with default timeout (None = infinite, like SLIME)."""
-        model = SGLangModel(tokenizer=mock_tokenizer)
-        assert model._timeout is None  # Infinite timeout by default
+        assert config["model_id"] == "my-model"
+
+
+class TestClientSetup:
+    """Tests for client setup."""
+
+    def test_client_is_required(self, mock_tokenizer):
+        """Client parameter is required."""
+        with pytest.raises(TypeError):
+            SGLangModel(tokenizer=mock_tokenizer)  # type: ignore[call-arg]
+
+    def test_client_stored_as_public_attr(self, mock_tokenizer):
+        """Client is stored as public attribute."""
+        client = SGLangClient(base_url="http://localhost:30000")
+        model = SGLangModel(tokenizer=mock_tokenizer, client=client)
+
+        assert model.client is client
+
+    def test_all_params_keyword_only(self, mock_tokenizer):
+        """All parameters are keyword-only (no positional args)."""
+        client = SGLangClient(base_url="http://localhost:30000")
+        with pytest.raises(TypeError):
+            SGLangModel(mock_tokenizer, client)  # type: ignore[misc]
 
 
 class TestSortToolResults:

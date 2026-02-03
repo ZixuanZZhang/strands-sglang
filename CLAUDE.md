@@ -43,7 +43,7 @@ pytest tests/integration/ -v --sglang-base-url=http://localhost:30000
 
 The package lives in `src/strands_sglang/` with 5 core modules:
 
-**SGLangModel** (`sglang.py`) - Main entry point implementing the Strands `Model` interface. Formats messages using HuggingFace chat templates (`apply_chat_template()`), calls SGLang's `/generate` endpoint (non-streaming by design for RL throughput), tracks TITO trajectory, and parses tool calls. Configuration via `SGLangConfig` TypedDict (base_url, model_id, params, timeout, return_logprobs, enable_thinking).
+**SGLangModel** (`sglang.py`) - Main entry point implementing the Strands `Model` interface. Requires a `tokenizer` and `SGLangClient` (all keyword-only). Formats messages using HuggingFace chat templates (`apply_chat_template()`), calls SGLang's `/generate` endpoint (non-streaming by design for RL throughput), tracks TITO trajectory, and parses tool calls. Configuration via `SGLangConfig` TypedDict (model_id, params, return_logprobs, enable_thinking).
 
 **SGLangClient** (`client.py`) - Async HTTP client using httpx with connection pooling and aggressive retry (60 attempts by default, aligned with SLIME RL framework). Non-retryable errors: 401, 403, 404, context-length 400. Has `from_slime_args()` factory for RL training deployment.
 
@@ -66,3 +66,17 @@ The package lives in `src/strands_sglang/` with 5 core modules:
 - Conventional commits enforced by pre-commit hook (feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert)
 - Python 3.10+ required
 - asyncio_mode = "auto" for pytest-asyncio
+
+## Integration Tests with Remote GPU Server
+
+If using a remote GPU server, SSH-tunnel port 30000 instead of copying code:
+
+```bash
+# 1. Launch SGLang on the remote server (docker or native)
+# 2. Tunnel the port locally
+ssh -L 30000:localhost:30000 -N -f <remote-host>
+# 3. Run tests locally as usual
+pytest tests/integration/ -v --sglang-base-url=http://localhost:30000 --sglang-model-id=<model-id>
+```
+
+Test with both an instruct model (e.g., `Qwen3-4B-Instruct-2507`) and a thinking model (e.g., `Qwen3-8B`) for full coverage. Thinking models will skip `MessageToTokenDrift` tests (expected).

@@ -56,18 +56,18 @@ import asyncio
 from transformers import AutoTokenizer
 from strands import Agent
 from strands_tools import calculator
-from strands_sglang import SGLangModel
+from strands_sglang import SGLangClient, SGLangModel
 
 async def main():
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-4B-Instruct-2507")
-    model = SGLangModel(tokenizer=tokenizer, base_url="http://localhost:30000")
+    client = SGLangClient(base_url="http://localhost:30000")
+    model = SGLangModel(tokenizer=tokenizer, client=client)
     agent = Agent(model=model, tools=[calculator])
 
-    model.reset()  # Reset TITO state for new episode
     result = await agent.invoke_async("What is 25 * 17?")
     print(result)
 
-    # Access TITO data for RL training
+    # Access token data for RL training
     print(f"Tokens: {model.token_manager.token_ids}")
     print(f"Loss mask: {model.token_manager.loss_mask}")
     print(f"Logprobs: {model.token_manager.logprobs}")
@@ -75,9 +75,9 @@ async def main():
 asyncio.run(main())
 ```
 
-## Slime Training
+## Training with `slime`
 
-For RL training with [slime](https://github.com/THUDM/slime/), `SGLangModel` with TITO eliminates the retokenization step, see an concrete example at [slime/examples/strands_sglang](https://github.com/THUDM/slime/tree/main/examples/strands_sglang):
+For RL training with [slime](https://github.com/THUDM/slime/), `SGLangModel` eliminates the retokenization step, see an concrete example at [slime/examples/strands_sglang](https://github.com/THUDM/slime/tree/main/examples/strands_sglang):
 
 ```python
 from strands import Agent, tool
@@ -93,7 +93,7 @@ def execute_python_code(code: str):
     ...
 
 async def generate(args, sample: Sample, sampling_params) -> Sample:
-    """Generate with TITO: tokens captured during generation, no retokenization."""
+    """Customize slime's rollout function using `SGLangModel`"""
     assert not args.partial_rollout, "Partial rollout not supported."
 
     state = GenerateState(args)
@@ -125,7 +125,7 @@ async def generate(args, sample: Sample, sampling_params) -> Sample:
         sample.status = Sample.Status.TRUNCATED
         logger.warning(f"TRUNCATED: {type(e).__name__}: {e}")
 
-    # TITO: extract trajectory from token_manager
+    # Extract token trajectory from token_manager
     tm = model.token_manager
     prompt_len = len(tm.segments[0])  # system + user are first segment
     sample.tokens = tm.token_ids
@@ -167,7 +167,7 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/). 
 # Examples:
 feat(client): add retry backoff configuration
 fix(sglang): handle empty response from server
-docs: update TITO usage examples
+docs: update usage examples
 ```
 
 Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
