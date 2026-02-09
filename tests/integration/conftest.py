@@ -27,7 +27,7 @@ from transformers import AutoTokenizer
 
 from strands_sglang import SGLangModel
 from strands_sglang.client import SGLangClient
-from strands_sglang.tool_parser import HermesToolCallParser
+from strands_sglang.tool_parsers import HermesToolCallParser
 
 # Mark all tests in this directory as integration tests
 pytestmark = pytest.mark.integration

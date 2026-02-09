@@ -28,7 +28,7 @@ from strands_tools import calculator
 
 from strands_sglang import SGLangModel
 from strands_sglang.client import SGLangClient
-from strands_sglang.tool_parser import HermesToolCallParser
+from strands_sglang.tool_parsers import HermesToolCallParser
 
 SYSTEM_PROMPT = """You are a math tutor. Always use the calculator tool to solve problems.
 

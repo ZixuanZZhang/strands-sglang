@@ -18,7 +18,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from strands_sglang import HermesToolCallParser, SGLangClient, SGLangModel
+from strands_sglang import SGLangClient, SGLangModel
+from strands_sglang.tool_parsers import HermesToolCallParser
 
 
 @pytest.fixture

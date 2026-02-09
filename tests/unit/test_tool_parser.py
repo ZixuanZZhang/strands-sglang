@@ -16,7 +16,7 @@
 
 import pytest
 
-from strands_sglang import (
+from strands_sglang.tool_parsers import (
     UNKNOWN_TOOL_NAME,
     HermesToolCallParser,
     ToolCallParseResult,
@@ -525,3 +525,35 @@ Actually, I should use a different approach.
         assert len(results) == 1
         assert results[0].name == "final_tool"
         assert results[0].input == {"query": "real"}
+
+
+class TestToolParserRegistry:
+    """Tests for tool parser registry."""
+
+    def test_get_hermes_parser(self):
+        """Get hermes parser by name."""
+        from strands_sglang.tool_parsers import get_tool_parser
+
+        parser = get_tool_parser("hermes")
+        assert isinstance(parser, HermesToolCallParser)
+
+    def test_get_parser_with_kwargs(self):
+        """Get parser with custom arguments."""
+        from strands_sglang.tool_parsers import get_tool_parser
+
+        parser = get_tool_parser("hermes", think_tokens=None)
+        assert parser.think_tokens is None
+
+    def test_unknown_parser_raises(self):
+        """Unknown parser name raises KeyError."""
+        from strands_sglang.tool_parsers import get_tool_parser
+
+        with pytest.raises(KeyError, match="Unknown tool parser"):
+            get_tool_parser("nonexistent")
+
+    def test_registry_contains_hermes(self):
+        """Registry contains hermes parser."""
+        from strands_sglang.tool_parsers import TOOL_PARSER_REGISTRY
+
+        assert "hermes" in TOOL_PARSER_REGISTRY
+        assert TOOL_PARSER_REGISTRY["hermes"] is HermesToolCallParser

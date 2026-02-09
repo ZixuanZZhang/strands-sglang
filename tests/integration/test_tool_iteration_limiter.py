@@ -31,7 +31,7 @@ from strands_tools import calculator
 
 from strands_sglang import MaxToolIterationsReachedError, SGLangModel, ToolIterationLimiter
 from strands_sglang.client import SGLangClient
-from strands_sglang.tool_parser import HermesToolCallParser
+from strands_sglang.tool_parsers import HermesToolCallParser
 
 
 def assert_max_iterations_reached(exc_info, expected_count: int | None = None):

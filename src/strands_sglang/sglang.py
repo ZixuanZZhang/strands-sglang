@@ -54,7 +54,7 @@ from typing_extensions import Unpack, override
 
 from .client import SGLangClient
 from .token import TokenManager
-from .tool_parser import HermesToolCallParser, ToolCallParser, ToolCallParseResult
+from .tool_parsers import HermesToolCallParser, ToolCallParser, ToolCallParseResult
 
 if TYPE_CHECKING:
     from transformers import PreTrainedTokenizerBase
