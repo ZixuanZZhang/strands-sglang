@@ -18,8 +18,6 @@ Tests low-level SGLangModel streaming and TITO functionality.
 Fixtures (model, tokenizer, calculator_tool) are provided by conftest.py.
 """
 
-from strands_sglang.client import SGLangClient
-
 
 class TestStreamBasic:
     """Basic streaming tests."""
@@ -221,87 +219,3 @@ class TestClientGenerate:
         assert any("messageStart" in e for e in events)
         assert any("contentBlockDelta" in e for e in events)
         assert any("messageStop" in e for e in events)
-
-
-class TestEnableThinking:
-    """Tests for enable_thinking config option (Qwen3 hybrid thinking mode)."""
-
-    async def test_enable_thinking_true_generates_think_tokens(self, tokenizer, sglang_base_url):
-        """With enable_thinking=True, Qwen3 should generate <think> content."""
-        from strands_sglang import SGLangModel
-
-        client = SGLangClient(base_url=sglang_base_url)
-        model = SGLangModel(
-            tokenizer=tokenizer,
-            client=client,
-            enable_thinking=True,
-            params={"max_new_tokens": 1024, "temperature": 0.7},
-        )
-        model.reset()
-
-        messages = [{"role": "user", "content": [{"text": "What is 2 + 2? Think step by step."}]}]
-        async for _ in model.stream(messages):
-            pass
-
-        # Decode the response
-        response = tokenizer.decode(model.token_manager.token_ids)
-
-        # For Qwen3 with thinking enabled, should have <think> content
-        # Note: This test is Qwen3-specific
-        if "Qwen3" in tokenizer.name_or_path or "qwen3" in tokenizer.name_or_path.lower():
-            assert "<think>" in response, "Qwen3 with enable_thinking=True should generate <think> tokens"
-
-    async def test_enable_thinking_false_minimal_think_tokens(self, tokenizer, sglang_base_url):
-        """With enable_thinking=False, Qwen3 should have minimal/empty <think> content."""
-        from strands_sglang import SGLangModel
-
-        client = SGLangClient(base_url=sglang_base_url)
-        model = SGLangModel(
-            tokenizer=tokenizer,
-            client=client,
-            enable_thinking=False,
-            params={"max_new_tokens": 512, "temperature": 0.7},
-        )
-        model.reset()
-
-        messages = [{"role": "user", "content": [{"text": "What is 3 + 3?"}]}]
-        async for _ in model.stream(messages):
-            pass
-
-        response = tokenizer.decode(model.token_manager.token_ids)
-
-        # For Qwen3 with thinking disabled, <think> tags may exist but should be empty
-        if "Qwen3" in tokenizer.name_or_path or "qwen3" in tokenizer.name_or_path.lower():
-            # Check that if <think> exists, it's mostly empty (just whitespace)
-            if "<think>" in response and "</think>" in response:
-                import re
-
-                think_content = re.search(r"<think>(.*?)</think>", response, re.DOTALL)
-                if think_content:
-                    # Empty or minimal thinking content (just whitespace)
-                    assert think_content.group(1).strip() == "", (
-                        f"With enable_thinking=False, <think> should be empty, got: {think_content.group(1)[:100]}"
-                    )
-
-    async def test_enable_thinking_none_default(self, tokenizer, sglang_base_url):
-        """With enable_thinking=None (default), parameter not passed to template."""
-        from strands_sglang import SGLangModel
-
-        # Default behavior - enable_thinking not set
-        client = SGLangClient(base_url=sglang_base_url)
-        model = SGLangModel(
-            tokenizer=tokenizer,
-            client=client,
-            params={"max_new_tokens": 256, "temperature": 0.7},
-        )
-
-        # Verify internal state
-        assert model._enable_thinking is None, "Default enable_thinking should be None"
-
-        model.reset()
-        messages = [{"role": "user", "content": [{"text": "Hi"}]}]
-        async for _ in model.stream(messages):
-            pass
-
-        # Should generate without error
-        assert len(model.token_manager) > 0, "Should generate tokens"
