@@ -34,6 +34,8 @@ import logging
 import re
 from typing import Any
 
+from typing_extensions import override
+
 from .base import UNKNOWN_TOOL_NAME, ToolParser, ToolParseResult, register_tool_parser
 
 logger = logging.getLogger(__name__)
@@ -106,6 +108,7 @@ class GLMToolParser(ToolParser):
             re.DOTALL,
         )
 
+    @override
     @property
     def message_separator(self) -> str:
         """Separator between messages in the chat template.
@@ -114,6 +117,7 @@ class GLMToolParser(ToolParser):
         """
         return ""
 
+    @override
     def parse(self, text: str) -> list[ToolParseResult]:
         """Parse tool calls from GLM model output.
 

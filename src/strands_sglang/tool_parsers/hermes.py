@@ -20,6 +20,8 @@ import json
 import logging
 import re
 
+from typing_extensions import override
+
 from .base import UNKNOWN_TOOL_NAME, ToolParser, ToolParseResult, register_tool_parser
 
 logger = logging.getLogger(__name__)
@@ -87,6 +89,7 @@ class HermesToolParser(ToolParser):
         else:
             self._think_pattern = None
 
+    @override
     @property
     def message_separator(self) -> str:
         """Separator between messages in the chat template.
@@ -99,6 +102,7 @@ class HermesToolParser(ToolParser):
         """
         return "\n"
 
+    @override
     def parse(self, text: str) -> list[ToolParseResult]:
         """Parse tool calls from model output.
 
