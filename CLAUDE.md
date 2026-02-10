@@ -43,7 +43,7 @@ pytest tests/integration/ -v --sglang-base-url=http://localhost:30000
 
 The package lives in `src/strands_sglang/` with 5 core modules:
 
-**SGLangModel** (`sglang.py`) - Main entry point implementing the Strands `Model` interface. Requires a `tokenizer` and `SGLangClient` (all keyword-only). Formats messages using HuggingFace chat templates (`apply_chat_template()`), calls SGLang's `/generate` endpoint (non-streaming by design for RL throughput), tracks TITO trajectory, and parses tool calls. Configuration via `SGLangConfig` TypedDict (model_id, params, return_logprobs, enable_thinking).
+**SGLangModel** (`sglang.py`) - Main entry point implementing the Strands `Model` interface. Requires `client` and `tokenizer` (all keyword-only). Formats messages using HuggingFace chat templates (`apply_chat_template()`), calls SGLang's `/generate` endpoint (non-streaming by design for RL throughput), tracks TITO trajectory, and parses tool calls. Configuration via `SGLangConfig` TypedDict (sampling_params, return_logprob, enable_thinking).
 
 **SGLangClient** (`client.py`) - Async HTTP client using httpx with connection pooling and aggressive retry (60 attempts by default, aligned with SLIME RL framework). Non-retryable errors: 401, 403, 404, context-length 400. Has `from_slime_args()` factory for RL training deployment.
 

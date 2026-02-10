@@ -79,12 +79,6 @@ def sglang_base_url(sglang_server_info):
     return sglang_server_info["base_url"]
 
 
-@pytest.fixture(scope="session")
-def sglang_model_id(sglang_server_info):
-    """Get model ID (auto-detected from server)."""
-    return sglang_server_info["model_path"]
-
-
 @pytest.fixture(scope="module")
 def tokenizer(sglang_server_info):
     """Load tokenizer for the configured model."""
@@ -93,15 +87,14 @@ def tokenizer(sglang_server_info):
 
 
 @pytest.fixture
-def model(tokenizer, sglang_base_url, sglang_model_id):
+def model(tokenizer, sglang_base_url):
     """Create fresh SGLangModel for each test (perfect isolation)."""
     client = SGLangClient(base_url=sglang_base_url)
     return SGLangModel(
-        tokenizer=tokenizer,
         client=client,
+        tokenizer=tokenizer,
         tool_parser=HermesToolParser(),
-        model_id=sglang_model_id,
-        params={"max_new_tokens": 32768},
+        sampling_params={"max_new_tokens": 32768},
     )
 
 

@@ -183,27 +183,12 @@ class SGLangClient:
         # Retry all connection/timeout errors
         return True
 
-    async def generate(
-        self,
-        input_ids: list[int],
-        *,
-        model: str | None = None,
-        sampling_params: dict[str, Any] | None = None,
-        return_logprob: bool = True,
-        logprob_start_len: int = 0,
-    ) -> dict[str, Any]:
+    async def generate(self, input_ids: list[int], **kwargs: Any) -> dict[str, Any]:
         """Generate from SGLang `/generate` endpoint.
 
-        Uses non-streaming POST for better parallelism in RL training.
-        Connections are released immediately after response, enabling
-        high concurrency without SSE overhead.
-
         Args:
-            input_ids: Input token IDs.
-            model: Optional model identifier.
-            sampling_params: Sampling parameters (temperature, top_p, max_new_tokens, etc.).
-            return_logprob: Whether to return log probabilities (default: True).
-            logprob_start_len: Start position for logprob computation (default: 0).
+            input_ids: Input token IDs. Do not set `text` when `input_ids` is provided.
+            **kwargs: Additional parameters passed directly to SGLang (see full list in SGLang documentation).
 
         Returns:
             Response dict with text, output_ids, meta_info (logprobs, finish_reason, etc.).
@@ -215,18 +200,9 @@ class SGLangClient:
         """
         payload: dict[str, Any] = {
             "input_ids": input_ids,
-            "stream": False,  # Always non-streaming for RL training
+            **kwargs,
+            "stream": False,  # override kwargs to non-streaming for RL training
         }
-
-        if model:
-            payload["model"] = model
-
-        if sampling_params:
-            payload["sampling_params"] = sampling_params
-
-        if return_logprob:
-            payload["return_logprob"] = True
-            payload["logprob_start_len"] = logprob_start_len
 
         last_error: Exception | None = None
 

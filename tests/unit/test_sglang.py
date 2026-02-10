@@ -37,7 +37,7 @@ def mock_tokenizer():
 def model(mock_tokenizer):
     """Create an SGLangModel with mock tokenizer."""
     client = SGLangClient(base_url="http://localhost:30000")
-    return SGLangModel(tokenizer=mock_tokenizer, client=client)
+    return SGLangModel(client=client, tokenizer=mock_tokenizer)
 
 
 class TestFormatTools:
@@ -104,8 +104,8 @@ class TestFormatPrompt:
         messages = [{"role": "user", "content": [{"text": "Hello"}]}]
         model.format_prompt(messages, system_prompt="You are helpful.")
 
-        call_args = mock_tokenizer.apply_chat_template.call_args
-        chat_messages = call_args[0][0]
+        call_kwargs = mock_tokenizer.apply_chat_template.call_args.kwargs
+        chat_messages = call_kwargs["conversation"]
         assert chat_messages[0]["role"] == "system"
         assert chat_messages[0]["content"] == "You are helpful."
 
@@ -296,7 +296,7 @@ class TestConfig:
     def test_default_config(self, mock_tokenizer):
         """Default configuration has no base_url or timeout (those belong to SGLangClient)."""
         client = SGLangClient(base_url="http://localhost:30000")
-        model = SGLangModel(tokenizer=mock_tokenizer, client=client)
+        model = SGLangModel(client=client, tokenizer=mock_tokenizer)
         config = model.get_config()
 
         assert "base_url" not in config
@@ -304,18 +304,18 @@ class TestConfig:
 
     def test_update_config(self, model):
         """Update configuration."""
-        model.update_config(model_id="new-model")
+        model.update_config(return_logprob=False)
         config = model.get_config()
 
-        assert config["model_id"] == "new-model"
+        assert config["return_logprob"] is False
 
-    def test_config_with_model_id(self, mock_tokenizer):
-        """Configuration with custom model_id."""
+    def test_config_with_sampling_params(self, mock_tokenizer):
+        """Configuration with custom sampling_params."""
         client = SGLangClient(base_url="http://localhost:30000")
-        model = SGLangModel(tokenizer=mock_tokenizer, client=client, model_id="my-model")
+        model = SGLangModel(client=client, tokenizer=mock_tokenizer, sampling_params={"max_new_tokens": 1024})
         config = model.get_config()
 
-        assert config["model_id"] == "my-model"
+        assert config["sampling_params"] == {"max_new_tokens": 1024}
 
 
 class TestClientSetup:
@@ -329,7 +329,7 @@ class TestClientSetup:
     def test_client_stored_as_public_attr(self, mock_tokenizer):
         """Client is stored as public attribute."""
         client = SGLangClient(base_url="http://localhost:30000")
-        model = SGLangModel(tokenizer=mock_tokenizer, client=client)
+        model = SGLangModel(client=client, tokenizer=mock_tokenizer)
 
         assert model.client is client
 

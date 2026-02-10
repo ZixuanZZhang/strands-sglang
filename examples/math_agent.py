@@ -42,11 +42,10 @@ async def main():
     # Create SGLangModel with TITO support
     client = SGLangClient(base_url=base_url)
     model = SGLangModel(
-        tokenizer=tokenizer,
         client=client,
+        tokenizer=tokenizer,
         tool_parser=HermesToolParser(),
-        model_id=model_id,
-        params={"max_new_tokens": 16384},  # Limit response length
+        sampling_params={"max_new_tokens": 16384},  # Limit response length
     )
 
     # -------------------------------------------------------------------------

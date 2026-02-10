@@ -100,10 +100,9 @@ async def generate(args, sample: Sample, sampling_params) -> Sample:
 
     # Set up Agent with SGLangModel and ToolIterationLimiter hook
     model = SGLangModel(
-        tokenizer=state.tokenizer,
         client=get_client(args),
-        model_id=args.hf_checkpoint.split("/")[-1],
-        params={k: sampling_params[k] for k in ["max_new_tokens", "temperature", "top_p"]},
+        tokenizer=state.tokenizer,
+        sampling_params={k: sampling_params[k] for k in ["max_new_tokens", "temperature", "top_p"]},
     )
     limiter = ToolIterationLimiter(max_iterations=MAX_TOOL_ITERATIONS)
     agent = Agent(

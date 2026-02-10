@@ -51,11 +51,10 @@ async def main():
 
     client = SGLangClient(base_url=base_url)
     model = SGLangModel(
-        tokenizer=tokenizer,
         client=client,
+        tokenizer=tokenizer,
         tool_parser=HermesToolParser(),
-        model_id=model_id,
-        params={"max_new_tokens": 32768},
+        sampling_params={"max_new_tokens": 32768},
     )
 
     # Complex multi-step problem to induce extended thinking

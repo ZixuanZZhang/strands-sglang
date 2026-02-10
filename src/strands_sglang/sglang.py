@@ -77,9 +77,9 @@ class SGLangModel(Model):
     Example:
         >>> from transformers import AutoTokenizer
         >>> from strands_sglang import SGLangClient, SGLangModel
-        >>> tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-4B-Thinking-2507")
         >>> client = SGLangClient(base_url="http://localhost:30000")
-        >>> model = SGLangModel(tokenizer=tokenizer, client=client)
+        >>> tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-4B", trust_remote_code=True)
+        >>> model = SGLangModel(client=client, tokenizer=tokenizer)
         >>> # After generation:
         >>> model.token_manager.token_ids    # Full token trajectory
         >>> model.token_manager.loss_mask    # Boolean mask for loss computation
@@ -87,38 +87,34 @@ class SGLangModel(Model):
     """
 
     class SGLangConfig(TypedDict, total=False):
-        """Configuration options for SGLang native API."""
+        """Configuration options for SGLang generation."""
 
-        model_id: str | None  # Optional model identifier
-        params: dict[str, Any] | None  # Default sampling parameters
-        return_logprobs: bool  # Return logprobs for all tokens (default: True)
-        enable_thinking: bool | None  # Enable thinking mode for Qwen3 hybrid models (default: None = auto)
+        sampling_params: dict[str, Any] | None  # Passed to /generate endpoint
+        return_logprob: bool | None  # Return logprobs for all tokens (default: True)
+        enable_thinking: bool | None  # Enable thinking mode for Qwen3 hybrid models
 
     def __init__(
         self,
         *,
-        tokenizer: PreTrainedTokenizerBase,
         client: SGLangClient,
+        tokenizer: PreTrainedTokenizerBase,
         tool_parser: ToolParser | None = None,
-        **model_config: Unpack[SGLangConfig],
+        **config: Unpack[SGLangConfig],
     ) -> None:
         """Initialize SGLang model provider.
 
         Args:
-            tokenizer: HuggingFace tokenizer for chat template and tokenization.
             client: SGLangClient for HTTP communication with the SGLang server.
+            tokenizer: HuggingFace tokenizer for chat template and tokenization.
             tool_parser: Parser for tool calls (default: HermesToolParser).
-            **model_config: See SGLangConfig for available options.
+            **config: See SGLangConfig for available options.
         """
-
-        # Essential attributes
-        self.tokenizer = tokenizer
         self.client = client
+        self.tokenizer = tokenizer
         self.tool_parser = tool_parser or HermesToolParser()
 
         # Config
-        self.config = dict(model_config)
-        self._enable_thinking: bool | None = model_config.get("enable_thinking")  # Used for Qwen3 hybrid models
+        self.config = dict(config)
 
         # State tracking (this makes SGLangModel stateful)
         self.token_manager = TokenManager()
@@ -226,25 +222,17 @@ class SGLangModel(Model):
         Applies the HuggingFace chat template with `add_generation_prompt=True`,
         which appends the assistant turn prefix for the model to continue.
 
-        For Qwen3 hybrid thinking models, `enable_thinking` controls whether
-        the model uses its internal reasoning mode. Only passed to template
-        when explicitly set (not None) to avoid affecting non-Qwen3 models.
-
         The result is manually tokenized (not model-generated) and added to
         the token trajectory with `loss_mask=False`.
         """
         chat_messages = self.format_request_messages(messages, system_prompt)
-        kwargs: dict[str, Any] = {
-            "tokenize": False,
-            "add_generation_prompt": True,
-        }
-        # Only pass enable_thinking if explicitly set (for Qwen3 hybrid models)
-        # This avoids affecting non-Qwen3 models that don't support this parameter
-        if self._enable_thinking is not None:
-            kwargs["enable_thinking"] = self._enable_thinking
-        if tools:
-            kwargs["tools"] = tools
-        return self.tokenizer.apply_chat_template(chat_messages, **kwargs)
+        return self.tokenizer.apply_chat_template(
+            conversation=chat_messages,
+            tools=tools,
+            add_generation_prompt=True,
+            tokenize=False,
+            enable_thinking=self.config.get("enable_thinking"),
+        )
 
     # -------------------------------------------------------------------------
     # Generation
@@ -269,13 +257,7 @@ class SGLangModel(Model):
         # Subsequent calls: only new messages
         if len(messages) > self._processed_message_count:
             new_messages = self._sort_tool_results(messages[self._processed_message_count :])
-            formatted = self.format_prompt(new_messages)
-
-            # Prepend message separator to align with chat template.
-            # The model generates up to <|im_end|>, but the chat template adds
-            # a separator (e.g., "\n") before the next <|im_start|>.
-            if self.tool_parser:
-                formatted = self.tool_parser.message_separator + formatted
+            formatted = self.tool_parser.message_separator + self.format_prompt(new_messages)
 
             return self.tokenizer.encode(formatted, add_special_tokens=False)
 
@@ -355,10 +337,10 @@ class SGLangModel(Model):
         system_prompt_content: list[SystemContentBlock] | None = None,
         **kwargs: Any,
     ) -> AsyncIterable[StreamEvent]:
-        """Stream generation from SGLang /generate endpoint.
+        """Model call with `SGLangModel` using the `/generate` endpoint.
 
-        Tokenizes messages, calls /generate, streams text deltas, and updates
-        the token trajectory with input/output tokens and logprobs.
+        The `stream` method follows Strands' protocol but actually disabled here for training-only usage.
+        This means users won't see streaming behavior such as print callbacks.
         """
         # Format tools (only on first call)
         if tool_specs and not self._current_tools:
@@ -367,8 +349,8 @@ class SGLangModel(Model):
 
         # Prepare request
         config = self.get_config()
-        sampling_params: dict[str, Any] = dict(config.get("params") or {})
-        return_logprobs = config.get("return_logprobs", True)
+        sampling_params: dict[str, Any] = dict(config.get("sampling_params") or {})
+        return_logprob = config.get("return_logprob", True)
         new_input_tokens = self.tokenize_prompt_messages(messages, system_prompt)
         # Tracking token IDs in token_manager to ensure the token-in feature
         input_ids = self.token_manager.token_ids + (new_input_tokens or [])
@@ -381,9 +363,8 @@ class SGLangModel(Model):
         try:
             response = await self.client.generate(
                 input_ids=input_ids,
-                model=config.get("model_id"),
                 sampling_params=sampling_params,
-                return_logprob=return_logprobs,
+                return_logprob=return_logprob,
             )
 
             # Extract response data
@@ -434,7 +415,7 @@ class SGLangModel(Model):
             if meta_info["finish_reason"].get("type") == "length":
                 stop_reason = "max_tokens"
 
-        yield {"messageStop": {"stopReason": cast(Any, stop_reason)}}
+        yield {"messageStop": {"stopReason": stop_reason}}
 
         # Yield usage metadata
         if meta_info:
