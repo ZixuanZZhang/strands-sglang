@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import json
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Callable, ClassVar, TypeVar
@@ -84,6 +85,42 @@ class ToolParser(ABC):
         foo
     """
 
+    DEFAULT_TOOL_START_TOKEN = "<tool_call>"
+    DEFAULT_TOOL_END_TOKEN = "</tool_call>"
+    DEFAULT_THINK_START_TOKEN = "<think>"
+    DEFAULT_THINK_END_TOKEN = "</think>"
+
+    def __init__(
+        self,
+        tool_start_token: str = DEFAULT_TOOL_START_TOKEN,
+        tool_end_token: str = DEFAULT_TOOL_END_TOKEN,
+        think_start_token: str = DEFAULT_THINK_START_TOKEN,
+        think_end_token: str = DEFAULT_THINK_END_TOKEN,
+    ) -> None:
+        """Initialize the parser with optional custom tokens.
+
+        Args:
+            tool_start_token: Opening token for tool calls.
+            tool_end_token: Closing token for tool calls.
+            think_start_token: Opening token for think blocks.
+            think_end_token: Closing token for think blocks.
+        """
+        self.tool_start_token = tool_start_token
+        self.tool_end_token = tool_end_token
+        self.think_start_token = think_start_token
+        self.think_end_token = think_end_token
+
+        # Pattern to extract tool call content (with whitespace trimming)
+        self.tool_pattern = re.compile(
+            rf"{re.escape(tool_start_token)}\s*(.*?)\s*{re.escape(tool_end_token)}",
+            re.DOTALL,
+        )
+        # Pattern to remove think blocks (no capture needed)
+        self.think_pattern = re.compile(
+            rf"{re.escape(think_start_token)}.*?{re.escape(think_end_token)}",
+            re.DOTALL,
+        )
+
     @property
     def message_separator(self) -> str:
         """Separator between messages in the chat template.
@@ -146,7 +183,7 @@ def get_tool_parser(name: str, **kwargs: Any) -> ToolParser:
 
     Example:
         >>> parser = get_tool_parser("hermes")
-        >>> parser = get_tool_parser("hermes", think_tokens=None)
+        >>> parser = get_tool_parser("hermes", think_start_token="<reasoning>")
     """
     if name not in TOOL_PARSER_REGISTRY:
         available = ", ".join(sorted(TOOL_PARSER_REGISTRY.keys()))

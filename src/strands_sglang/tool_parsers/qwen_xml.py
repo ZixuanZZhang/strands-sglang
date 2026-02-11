@@ -53,14 +53,7 @@ class QwenXMLToolParser(ToolParser):
         Qwen Coder's chat template uses newline as separator between messages:
         `<|im_start|>role\\ncontent<|im_end|>\\n<|im_start|>...`
         The message_separator property returns "\\n" to match this format.
-
-    Attributes:
-        tool_call_tokens: Start/end delimiters for tool calls.
-        think_tokens: Start/end delimiters for think blocks to exclude.
     """
-
-    DEFAULT_TOOL_CALL_TOKENS = ("<tool_call>", "</tool_call>")
-    DEFAULT_THINK_TOKENS = ("<think>", "</think>")
 
     # Pattern to extract function name from <function=name>...</function>
     _FUNCTION_PATTERN = re.compile(r"<function=([^>]+)>(.*?)</function>", re.DOTALL)
@@ -68,42 +61,10 @@ class QwenXMLToolParser(ToolParser):
     # Pattern to extract parameters from <parameter=name>value</parameter>
     _PARAMETER_PATTERN = re.compile(r"<parameter=([^>]+)>(.*?)</parameter>", re.DOTALL)
 
-    def __init__(
-        self,
-        tool_call_tokens: tuple[str, str] = DEFAULT_TOOL_CALL_TOKENS,
-        think_tokens: tuple[str, str] | None = DEFAULT_THINK_TOKENS,
-    ) -> None:
-        """Initialize the parser with optional custom tokens.
-
-        Args:
-            tool_call_tokens: (start, end) delimiters for tool calls.
-            think_tokens: (start, end) delimiters for think blocks to exclude.
-                Set to None to disable think block exclusion.
-        """
-        self.tool_call_tokens = tool_call_tokens
-        self.think_tokens = think_tokens
-
-        self._pattern = re.compile(
-            rf"{re.escape(tool_call_tokens[0])}\s*(.*?)\s*{re.escape(tool_call_tokens[1])}",
-            re.DOTALL,
-        )
-
-        # Pattern to remove think blocks (if configured)
-        if think_tokens:
-            self._think_pattern: re.Pattern[str] | None = re.compile(
-                rf"{re.escape(think_tokens[0])}.*?{re.escape(think_tokens[1])}",
-                re.DOTALL,
-            )
-        else:
-            self._think_pattern = None
-
     @override
     @property
     def message_separator(self) -> str:
-        """Separator between messages in the chat template.
-
-        Qwen Coder models use newline `\\n` as separator between messages.
-        """
+        """Qwen Coder models use newline as separator between messages."""
         return "\n"
 
     @override
@@ -117,12 +78,11 @@ class QwenXMLToolParser(ToolParser):
             List of tool call results (successful and errors).
         """
         # Remove think blocks to avoid parsing draft tool calls from reasoning
-        if self._think_pattern:
-            text = self._think_pattern.sub("", text)
+        text = self.think_pattern.sub("", text)
 
         tool_calls: list[ToolParseResult] = []
 
-        for i, match in enumerate(self._pattern.finditer(text)):
+        for i, match in enumerate(self.tool_pattern.finditer(text)):
             raw_content = match.group(1).strip()
             tool_call_id = f"call_{i:04d}"  # Sequential IDs for sortability
 

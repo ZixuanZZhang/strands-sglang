@@ -62,60 +62,15 @@ class GLMToolParser(ToolParser):
         Models with reasoning capabilities may output draft tool calls
         inside <think>...</think> blocks. These are excluded by default
         to avoid executing planning/reasoning tool calls.
-        Set think_tokens=None to disable this behavior.
 
     Chat Template Notes:
         GLM uses no explicit separator between messages.
-
-    Attributes:
-        tool_call_tokens: Start/end delimiters for tool calls.
-        think_tokens: Start/end delimiters for think blocks to exclude.
     """
 
-    DEFAULT_TOOL_CALL_TOKENS = ("<tool_call>", "</tool_call>")
-    DEFAULT_THINK_TOKENS = ("<think>", "</think>")
-
-    def __init__(
-        self,
-        tool_call_tokens: tuple[str, str] = DEFAULT_TOOL_CALL_TOKENS,
-        think_tokens: tuple[str, str] | None = DEFAULT_THINK_TOKENS,
-    ) -> None:
-        """Initialize the parser with optional custom tokens.
-
-        Args:
-            tool_call_tokens: (start, end) delimiters for tool calls.
-            think_tokens: (start, end) delimiters for think blocks to exclude.
-                Set to None to disable think block exclusion.
-        """
-        self.tool_call_tokens = tool_call_tokens
-        self.think_tokens = think_tokens
-
-        self._pattern = re.compile(
-            rf"{re.escape(tool_call_tokens[0])}\s*(.*?)\s*{re.escape(tool_call_tokens[1])}",
-            re.DOTALL,
-        )
-
-        if think_tokens:
-            self._think_pattern: re.Pattern[str] | None = re.compile(
-                rf"{re.escape(think_tokens[0])}.*?{re.escape(think_tokens[1])}",
-                re.DOTALL,
-            )
-        else:
-            self._think_pattern = None
-
-        self._arg_pattern = re.compile(
-            r"<arg_key>\s*(.*?)\s*</arg_key>\s*<arg_value>\s*(.*?)\s*</arg_value>",
-            re.DOTALL,
-        )
-
-    @override
-    @property
-    def message_separator(self) -> str:
-        """Separator between messages in the chat template.
-
-        GLM uses no explicit separator between messages.
-        """
-        return ""
+    ARG_PATTERN = re.compile(
+        r"<arg_key>\s*(.*?)\s*</arg_key>\s*<arg_value>\s*(.*?)\s*</arg_value>",
+        re.DOTALL,
+    )
 
     @override
     def parse(self, text: str) -> list[ToolParseResult]:
@@ -131,12 +86,11 @@ class GLMToolParser(ToolParser):
             List of tool call results (successful and errors).
         """
         # Remove think blocks to avoid parsing draft tool calls from reasoning
-        if self._think_pattern:
-            text = self._think_pattern.sub("", text)
+        text = self.think_pattern.sub("", text)
 
         tool_calls: list[ToolParseResult] = []
 
-        for i, match in enumerate(self._pattern.finditer(text)):
+        for i, match in enumerate(self.tool_pattern.finditer(text)):
             raw_content = match.group(1).strip()
             tool_call_id = f"call_{i:04d}"  # Sequential IDs for sortability
 
@@ -153,7 +107,7 @@ class GLMToolParser(ToolParser):
             # Parse <arg_key>/<arg_value> pairs
             arguments: dict[str, Any] = {}
             rest = lines[1] if len(lines) > 1 else ""
-            for arg_match in self._arg_pattern.finditer(rest):
+            for arg_match in self.ARG_PATTERN.finditer(rest):
                 key = arg_match.group(1).strip()
                 value_str = arg_match.group(2).strip()
                 try:
