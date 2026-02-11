@@ -332,7 +332,7 @@ class TestFormatRequestMessages:
 
     def test_custom_tokens_preserved(self, mock_tokenizer):
         """Custom parser tokens are preserved for TITO (same as default)."""
-        custom_parser = HermesToolParser(tool_call_tokens=("<function>", "</function>"))
+        custom_parser = HermesToolParser(tool_start_token="<function>", tool_end_token="</function>")
         client = SGLangClient(base_url="http://localhost:30000")
         model = SGLangModel(tokenizer=mock_tokenizer, client=client, tool_parser=custom_parser)
 
@@ -355,7 +355,7 @@ class TestFormatRequestMessages:
 
     def test_custom_tokens_preserve_default_markup(self, mock_tokenizer):
         """Custom tokens don't strip default <tool_call> markup."""
-        custom_parser = HermesToolParser(tool_call_tokens=("<function>", "</function>"))
+        custom_parser = HermesToolParser(tool_start_token="<function>", tool_end_token="</function>")
         client = SGLangClient(base_url="http://localhost:30000")
         model = SGLangModel(tokenizer=mock_tokenizer, client=client, tool_parser=custom_parser)
 
