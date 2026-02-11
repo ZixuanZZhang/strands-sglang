@@ -278,8 +278,8 @@ class TestHermesToolParser:
     # --- Custom Tokens ---
 
     def test_custom_tokens(self):
-        """Use custom tool_call_tokens."""
-        parser = HermesToolParser(tool_call_tokens=("<function>", "</function>"))
+        """Use custom tool tokens."""
+        parser = HermesToolParser(tool_start_token="<function>", tool_end_token="</function>")
         text = '<function>{"name": "custom", "arguments": {}}</function>'
         results = parser.parse(text)
 
@@ -288,7 +288,7 @@ class TestHermesToolParser:
 
     def test_custom_tokens_ignore_default(self):
         """Custom tokens ignore default format."""
-        parser = HermesToolParser(tool_call_tokens=("<function>", "</function>"))
+        parser = HermesToolParser(tool_start_token="<function>", tool_end_token="</function>")
         # Default format should not be parsed
         text = '<tool_call>{"name": "ignored", "arguments": {}}</tool_call>'
         results = parser.parse(text)
@@ -436,25 +436,9 @@ class TestHermesToolParser:
         assert len(results) == 1
         assert results[0].name == "tool"
 
-    def test_disable_think_block_exclusion(self):
-        """Setting think_tokens=None disables exclusion."""
-        parser = HermesToolParser(think_tokens=None)
-        text = """
-        <think>
-        <tool_call>{"name": "inside_think", "arguments": {}}</tool_call>
-        </think>
-        <tool_call>{"name": "outside_think", "arguments": {}}</tool_call>
-        """
-        results = parser.parse(text)
-
-        # Both should be parsed when exclusion is disabled
-        assert len(results) == 2
-        assert results[0].name == "inside_think"
-        assert results[1].name == "outside_think"
-
     def test_custom_think_tokens(self):
         """Custom think tokens work correctly."""
-        parser = HermesToolParser(think_tokens=("<reasoning>", "</reasoning>"))
+        parser = HermesToolParser(think_start_token="<reasoning>", think_end_token="</reasoning>")
         text = """
         <reasoning>
         <tool_call>{"name": "draft", "arguments": {}}</tool_call>
@@ -468,7 +452,7 @@ class TestHermesToolParser:
 
     def test_custom_think_tokens_ignore_default(self):
         """Custom think tokens don't exclude default <think> blocks."""
-        parser = HermesToolParser(think_tokens=("<reasoning>", "</reasoning>"))
+        parser = HermesToolParser(think_start_token="<reasoning>", think_end_token="</reasoning>")
         text = """
         <think>
         <tool_call>{"name": "in_think", "arguments": {}}</tool_call>
@@ -663,8 +647,8 @@ if __name__ == "__main__":
     # --- Custom Tokens ---
 
     def test_custom_tokens(self):
-        """Use custom tool_call_tokens."""
-        parser = QwenXMLToolParser(tool_call_tokens=("<call>", "</call>"))
+        """Use custom tool tokens."""
+        parser = QwenXMLToolParser(tool_start_token="<call>", tool_end_token="</call>")
         text = """<call>
 <function=custom>
 <parameter=x>1</parameter>
@@ -677,7 +661,7 @@ if __name__ == "__main__":
 
     def test_custom_tokens_ignore_default(self):
         """Custom tokens ignore default format."""
-        parser = QwenXMLToolParser(tool_call_tokens=("<call>", "</call>"))
+        parser = QwenXMLToolParser(tool_start_token="<call>", tool_end_token="</call>")
         text = """<tool_call>
 <function=ignored>
 <parameter=x>1</parameter>
@@ -713,27 +697,25 @@ No, let me reconsider...
         assert results[0].name == "actual_tool"
         assert results[0].input == {"y": "2"}
 
-    def test_disable_think_block_exclusion(self):
-        """Setting think_tokens=None disables exclusion."""
-        parser = QwenXMLToolParser(think_tokens=None)
+    def test_custom_think_tokens(self):
+        """Custom think tokens work correctly."""
+        parser = QwenXMLToolParser(think_start_token="<reasoning>", think_end_token="</reasoning>")
         text = """
-<think>
+<reasoning>
 <tool_call>
-<function=inside_think>
+<function=inside_reasoning>
 </function>
 </tool_call>
-</think>
+</reasoning>
 <tool_call>
-<function=outside_think>
+<function=outside_reasoning>
 </function>
 </tool_call>
 """
         results = parser.parse(text)
 
-        # Both should be parsed when exclusion is disabled
-        assert len(results) == 2
-        assert results[0].name == "inside_think"
-        assert results[1].name == "outside_think"
+        assert len(results) == 1
+        assert results[0].name == "outside_reasoning"
 
     # --- Edge Cases ---
 
@@ -1011,8 +993,8 @@ if __name__ == "__main__":
     # --- Custom Tokens ---
 
     def test_custom_tokens(self):
-        """Use custom tool_call_tokens."""
-        parser = GLMToolParser(tool_call_tokens=("<call>", "</call>"))
+        """Use custom tool tokens."""
+        parser = GLMToolParser(tool_start_token="<call>", tool_end_token="</call>")
         text = """<call>custom
 <arg_key>x</arg_key>
 <arg_value>1</arg_value>
@@ -1025,7 +1007,7 @@ if __name__ == "__main__":
 
     def test_custom_tokens_ignore_default(self):
         """Custom tokens ignore default format."""
-        parser = GLMToolParser(tool_call_tokens=("<call>", "</call>"))
+        parser = GLMToolParser(tool_start_token="<call>", tool_end_token="</call>")
         text = """<tool_call>ignored
 <arg_key>x</arg_key>
 <arg_value>1</arg_value>
@@ -1058,23 +1040,21 @@ No, let me reconsider...
         assert results[0].name == "actual_tool"
         assert results[0].input == {"y": 2}  # JSON-decoded as integer
 
-    def test_disable_think_block_exclusion(self):
-        """Setting think_tokens=None disables exclusion."""
-        parser = GLMToolParser(think_tokens=None)
+    def test_custom_think_tokens(self):
+        """Custom think tokens work correctly."""
+        parser = GLMToolParser(think_start_token="<reasoning>", think_end_token="</reasoning>")
         text = """
-<think>
-<tool_call>inside_think
+<reasoning>
+<tool_call>inside_reasoning
 </tool_call>
-</think>
-<tool_call>outside_think
+</reasoning>
+<tool_call>outside_reasoning
 </tool_call>
 """
         results = parser.parse(text)
 
-        # Both should be parsed when exclusion is disabled
-        assert len(results) == 2
-        assert results[0].name == "inside_think"
-        assert results[1].name == "outside_think"
+        assert len(results) == 1
+        assert results[0].name == "outside_reasoning"
 
     # --- Edge Cases ---
 
@@ -1184,8 +1164,8 @@ class TestToolParserRegistry:
         """Get parser with custom arguments."""
         from strands_sglang.tool_parsers import get_tool_parser
 
-        parser = get_tool_parser("hermes", think_tokens=None)
-        assert parser.think_tokens is None
+        parser = get_tool_parser("hermes", think_start_token="<reasoning>")
+        assert parser.think_start_token == "<reasoning>"
 
     def test_unknown_parser_raises(self):
         """Unknown parser name raises KeyError."""

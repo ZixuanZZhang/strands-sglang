@@ -77,16 +77,12 @@ class TestStreamWithTools:
         system_prompt = "You are a calculator. Use the calculator tool for all math."
 
         events = []
-        async for event in model.stream(
-            messages, tool_specs=[calculator_tool], system_prompt=system_prompt
-        ):
+        async for event in model.stream(messages, tool_specs=[calculator_tool], system_prompt=system_prompt):
             events.append(event)
 
         # Check for tool use events
         tool_starts = [e for e in events if "contentBlockStart" in e]
-        tool_use_starts = [
-            e for e in tool_starts if "toolUse" in e["contentBlockStart"].get("start", {})
-        ]
+        tool_use_starts = [e for e in tool_starts if "toolUse" in e["contentBlockStart"].get("start", {})]
 
         # Model should have called calculator tool
         if tool_use_starts:
@@ -101,9 +97,7 @@ class TestStreamWithTools:
 
         # First generation
         events = []
-        async for event in model.stream(
-            messages, tool_specs=[calculator_tool], system_prompt=system_prompt
-        ):
+        async for event in model.stream(messages, tool_specs=[calculator_tool], system_prompt=system_prompt):
             events.append(event)
 
         # Add assistant response and tool result
@@ -130,9 +124,7 @@ class TestStreamWithTools:
 
         # Second generation: model should respond after receiving tool result
         events = []
-        async for event in model.stream(
-            messages, tool_specs=[calculator_tool], system_prompt=system_prompt
-        ):
+        async for event in model.stream(messages, tool_specs=[calculator_tool], system_prompt=system_prompt):
             events.append(event)
 
         # Should have generated a response (content deltas or tool calls)
@@ -163,6 +155,22 @@ class TestTITO:
         assert total_tokens == len(model.token_manager.token_ids)
         assert total_tokens == len(model.token_manager.loss_mask)
         assert total_tokens == len(model.token_manager.logprobs)
+
+    async def test_logprobs_no_none_when_return_logprob_enabled(self, model):
+        """Logprobs should never contain None when return_logprob=True (regression test for v0.2.0)."""
+        # Ensure return_logprob is enabled (default is True)
+        assert model.config.get("return_logprob", True) is True
+
+        messages = [{"role": "user", "content": [{"text": "Say hello"}]}]
+        async for _ in model.stream(messages):
+            pass
+
+        logprobs = model.token_manager.logprobs
+        assert len(logprobs) > 0, "Should have logprobs after generation"
+        assert all(lp is not None for lp in logprobs), (
+            f"Logprobs should never contain None when return_logprob=True. "
+            f"Found {logprobs.count(None)} None values out of {len(logprobs)} total."
+        )
 
     async def test_incremental_tokenization(self, model):
         """Subsequent calls only tokenize new messages."""
