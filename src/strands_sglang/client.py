@@ -111,6 +111,7 @@ class SGLangClient:
         # Store config for lazy session creation (avoids aiohttp warning about creating session outside event loop)
         self._max_connections = max_connections
         self._timeout = aiohttp.ClientTimeout(total=timeout, connect=connect_timeout)
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._connector: aiohttp.TCPConnector | None = None
         self._session: aiohttp.ClientSession | None = None
 
@@ -121,15 +122,29 @@ class SGLangClient:
         )
 
     def _get_session(self) -> aiohttp.ClientSession:
-        """Get or create the aiohttp session (lazy initialization)."""
-        if self._session is None or self._session.closed:
-            self._connector = aiohttp.TCPConnector(limit=self._max_connections)
-            self._session = aiohttp.ClientSession(
-                base_url=self.base_url,
-                timeout=self._timeout,
-                connector=self._connector,
-                connector_owner=False,  # Connector outlives session, managed in close()
-            )
+        """Get or create the aiohttp session (lazy initialization).
+
+        Automatically recreates the session if the event loop has changed (e.g.,
+        pytest-asyncio creates a new loop per test, or ``lru_cache``-d clients
+        survive across loop restarts in RL training).
+        """
+        loop = asyncio.get_running_loop()
+
+        if self._session is not None and not self._session.closed and self._loop is loop:
+            return self._session
+
+        # Clean up old connector if present (sync close, best-effort)
+        if self._connector is not None and not self._connector.closed:
+            self._connector._close()
+
+        self._loop = loop
+        self._connector = aiohttp.TCPConnector(limit=self._max_connections)
+        self._session = aiohttp.ClientSession(
+            base_url=self.base_url,
+            timeout=self._timeout,
+            connector=self._connector,
+            connector_owner=False,  # Connector outlives session, managed in close()
+        )
         return self._session
 
     @classmethod
