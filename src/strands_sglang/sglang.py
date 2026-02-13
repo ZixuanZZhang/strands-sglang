@@ -87,6 +87,7 @@ class SGLangModel(Model):
         sampling_params: dict[str, Any] | None  # Passed to /generate endpoint
         return_logprob: bool | None  # Return logprobs for all tokens (default: True)
         enable_thinking: bool | None  # Enable thinking mode for Qwen3 hybrid models
+        return_routed_experts: bool | None  # Record MoE routing decisions for routing replay
 
     def __init__(
         self,
@@ -344,6 +345,7 @@ class SGLangModel(Model):
         config = self.get_config()
         sampling_params: dict[str, Any] = dict(config.get("sampling_params") or {})
         return_logprob = config.get("return_logprob", True)
+        return_routed_experts = config.get("return_routed_experts", False)
         new_input_tokens = self.tokenize_prompt_messages(messages, system_prompt)
         # Tracking token IDs in token_manager to ensure the token-in feature
         input_ids = self.token_manager.token_ids + (new_input_tokens or [])
@@ -359,6 +361,8 @@ class SGLangModel(Model):
                 sampling_params=sampling_params,
                 return_logprob=return_logprob,
                 logprob_start_len=0 if return_logprob else None,
+                return_routed_experts=return_routed_experts,
+                routed_experts_start_len=len(self.token_manager) if return_routed_experts else None,
             )
 
             # Extract response data
@@ -384,6 +388,11 @@ class SGLangModel(Model):
         if output_ids:
             self.token_manager.add_response(token_ids=output_ids, logprobs=output_logprobs)
         self._processed_message_count = len(messages) + 1
+
+        # Accumulate routed experts for routing replay
+        routed_experts_data = meta_info.get("routed_experts") if return_routed_experts else None
+        if routed_experts_data:
+            self.token_manager.add_routed_experts(routed_experts_data)
 
         # End text block, start tool use blocks if there are any tool calls
         yield {"contentBlockStop": {}}
