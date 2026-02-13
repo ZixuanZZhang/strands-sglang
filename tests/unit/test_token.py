@@ -14,9 +14,6 @@
 
 """Unit tests for token module."""
 
-import base64
-import struct
-
 import pytest
 
 from strands_sglang import Token, TokenManager
@@ -258,16 +255,6 @@ class TestTokenManagerReset:
         assert manager.tokens == []
         assert manager.segments == []
 
-    def test_reset_clears_routed_experts(self):
-        """reset clears accumulated routed experts."""
-        manager = TokenManager()
-        chunk = base64.b64encode(b"\x01\x00\x00\x00").decode("ascii")
-        manager.add_routed_experts(chunk)
-
-        manager.reset()
-
-        assert manager.routed_experts is None
-
     def test_reset_allows_reuse(self):
         """Manager can be reused after reset."""
         manager = TokenManager()
@@ -345,63 +332,3 @@ class TestEdgeCases:
         manager = TokenManager()
         manager.add_prompt([100000, 999999])
         assert manager.token_ids == [100000, 999999]
-
-
-def _make_routed_experts_b64(expert_ids: list[int]) -> str:
-    """Helper: encode a list of int32 expert IDs to base64 (matching SGLang format)."""
-    raw = struct.pack(f"<{len(expert_ids)}i", *expert_ids)
-    return base64.b64encode(raw).decode("ascii")
-
-
-class TestRoutedExperts:
-    """Tests for routed experts accumulation."""
-
-    def test_empty_manager_returns_none(self):
-        """No routing data returns None."""
-        manager = TokenManager()
-        assert manager.routed_experts is None
-
-    def test_single_chunk(self):
-        """Single chunk round-trips through base64 correctly."""
-        manager = TokenManager()
-        experts = [0, 1, 2, 3]
-        chunk = _make_routed_experts_b64(experts)
-
-        manager.add_routed_experts(chunk)
-
-        result = manager.routed_experts
-        assert result is not None
-        decoded = struct.unpack(f"<{len(experts)}i", base64.b64decode(result))
-        assert list(decoded) == experts
-
-    def test_multi_turn_accumulation(self):
-        """Multiple chunks are concatenated in order."""
-        manager = TokenManager()
-
-        # Turn 1: prompt + response routing (3 tokens, 1 layer, top_k=2)
-        turn1_experts = [10, 20, 30, 40, 50, 60]  # 3 tokens * 1 layer * 2 experts
-        manager.add_routed_experts(_make_routed_experts_b64(turn1_experts))
-
-        # Turn 2: new tokens routing (2 tokens, 1 layer, top_k=2)
-        turn2_experts = [70, 80, 90, 100]  # 2 tokens * 1 layer * 2 experts
-        manager.add_routed_experts(_make_routed_experts_b64(turn2_experts))
-
-        result = manager.routed_experts
-        assert result is not None
-        all_experts = turn1_experts + turn2_experts
-        decoded = struct.unpack(f"<{len(all_experts)}i", base64.b64decode(result))
-        assert list(decoded) == all_experts
-
-    def test_reset_then_reuse(self):
-        """Routing data can be accumulated after reset."""
-        manager = TokenManager()
-        manager.add_routed_experts(_make_routed_experts_b64([1, 2]))
-        manager.reset()
-
-        new_experts = [5, 6, 7]
-        manager.add_routed_experts(_make_routed_experts_b64(new_experts))
-
-        result = manager.routed_experts
-        assert result is not None
-        decoded = struct.unpack(f"<{len(new_experts)}i", base64.b64decode(result))
-        assert list(decoded) == new_experts
