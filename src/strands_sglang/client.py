@@ -24,6 +24,7 @@ Aligned with slime's http_utils.py for RL training stability:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import Any
 
@@ -207,10 +208,18 @@ class SGLangClient:
         last_error: Exception | None = None
 
         for attempt in range(self.max_retries + 1):
+            response = None
             try:
                 response = await self._client.post("/generate", json=payload)
                 response.raise_for_status()
-                return response.json()
+                # Fully consume body before closing (aligned with slime #1488)
+                content = await response.aread()
+                try:
+                    return json.loads(content)
+                except json.JSONDecodeError as e:
+                    # Non-JSON response — treat as retryable error
+                    preview = content.decode(errors="replace")[:200]
+                    raise httpx.DecodingError(f"Invalid JSON response: {preview}") from e
 
             except Exception as e:
                 last_error = e
@@ -233,6 +242,10 @@ class SGLangClient:
                         f"{type(e).__name__}: {e}, response={response_text}"
                     )
                     raise
+            finally:
+                # Ensure response is closed to release connection back to pool (slime #1520)
+                if response is not None:
+                    await response.aclose()
 
         # Should not reach here, but just in case
         if last_error:
