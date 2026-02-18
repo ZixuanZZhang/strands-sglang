@@ -196,9 +196,9 @@ class SGLangModel(Model):
             {
                 "type": "function",
                 "function": {
-                    "name": spec.get("name", ""),
-                    "description": spec.get("description", ""),
-                    "parameters": spec.get("inputSchema", {}),
+                    "name": spec["name"],
+                    "description": spec["description"],
+                    "parameters": spec["inputSchema"]["json"],
                 },
             }
             for spec in tool_specs

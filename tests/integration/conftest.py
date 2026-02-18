@@ -106,13 +106,15 @@ def calculator_tool():
         "name": "calculator",
         "description": "Perform arithmetic calculations",
         "inputSchema": {
-            "type": "object",
-            "properties": {
-                "expression": {
-                    "type": "string",
-                    "description": "The arithmetic expression to evaluate",
-                }
-            },
-            "required": ["expression"],
+            "json": {
+                "type": "object",
+                "properties": {
+                    "expression": {
+                        "type": "string",
+                        "description": "The arithmetic expression to evaluate",
+                    }
+                },
+                "required": ["expression"],
+            }
         },
     }
