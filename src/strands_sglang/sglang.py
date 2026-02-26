@@ -155,7 +155,7 @@ class SGLangModel(Model):
     # -------------------------------------------------------------------------
 
     @classmethod
-    def _format_message_content(cls, message: dict[str, Any]) -> None:
+    def format_request_message_content(cls, message: dict[str, Any]) -> None:
         """Format a single message's content for chat templates.
 
         Flattens content arrays and preserves raw content including tool call
@@ -186,7 +186,7 @@ class SGLangModel(Model):
         result = OpenAIModel.format_request_messages(messages=messages, system_prompt=system_prompt)
 
         for message in result:
-            cls._format_message_content(message)
+            cls.format_request_message_content(message)
 
         return result
 
