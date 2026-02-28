@@ -14,17 +14,19 @@
 
 """Strands hook for limiting tool usage within a single agent invocation.
 
-Supports two limits:
+Supports three limits:
 - **Iteration limit** (`max_tool_iters`): one iteration = one model response requesting
   tools + tool execution. Parallel tool calls in a single response count as one iteration.
 - **Call limit** (`max_tool_calls`): counts each individual tool call regardless of
   whether they were parallel or sequential.
+- **Parallel call limit** (`max_parallel_tool_calls`): within a single model response, at most N tool calls are executed. Excess calls are cancelled via
+  ``BeforeToolCallEvent.cancel_tool`` and returned to the model as error results.
 """
 
 import logging
 
 from strands.hooks import HookProvider, HookRegistry
-from strands.hooks.events import MessageAddedEvent
+from strands.hooks.events import BeforeToolCallEvent, MessageAddedEvent
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +70,12 @@ class ToolLimiter(HookProvider):
         ...     print(f"Stopped after {limiter.tool_iter_count} iterations")
     """
 
-    def __init__(self, max_tool_iters: int | None = None, max_tool_calls: int | None = None):
+    def __init__(
+        self,
+        max_tool_iters: int | None = None,
+        max_tool_calls: int | None = None,
+        max_parallel_tool_calls: int | None = None,
+    ):
         """Initialize the limiter.
 
         Args:
@@ -77,19 +84,25 @@ class ToolLimiter(HookProvider):
                 Parallel tool calls count as one iteration. None means no limit.
             max_tool_calls: Maximum number of individual tool calls allowed.
                 Each tool call counts individually regardless of parallelism. None means no limit.
+            max_parallel_tool_calls: Maximum number of parallel tool calls allowed per model response. Excess calls are cancelled and returned to the
+                model as error results. None means no limit.
         """
         self.max_tool_iters = max_tool_iters
         self.max_tool_calls = max_tool_calls
+        self.max_parallel_tool_calls = max_parallel_tool_calls
         self.reset()
 
     def reset(self) -> None:
         """Reset counters for a new invocation."""
         self.tool_iter_count = 0
         self.tool_call_count = 0
+        self._parallel_call_count = 0
+        self.cancelled_tool_call_count = 0
 
     def register_hooks(self, registry: HookRegistry) -> None:
         """Register hooks with the strands agent."""
         registry.add_callback(MessageAddedEvent, self._on_message_added)
+        registry.add_callback(BeforeToolCallEvent, self._on_before_tool_call)
 
     def _on_message_added(self, event: MessageAddedEvent) -> None:
         """Count iterations/calls and raise when limit exceeded.
@@ -113,6 +126,7 @@ class ToolLimiter(HookProvider):
             if cur_tool_call_count > 0:
                 self.tool_iter_count += 1
                 self.tool_call_count += cur_tool_call_count
+                self._parallel_call_count = 0  # Reset parallel call counter for new model response
                 logger.debug(
                     f"Iteration {self.tool_iter_count} started "
                     f"({cur_tool_call_count} tool call(s), {self.tool_call_count} total calls)"
@@ -133,3 +147,18 @@ class ToolLimiter(HookProvider):
                         f"Max tool calls ({self.max_tool_calls}) reached"
                         " (parallel tool calls count as individual calls)"
                     )
+
+    def _on_before_tool_call(self, event: BeforeToolCallEvent) -> None:
+        """Cancel excess tool calls when parallel call limit is reached."""
+        if self.max_parallel_tool_calls is None:
+            return
+
+        self._parallel_call_count += 1
+        if self._parallel_call_count > self.max_parallel_tool_calls:
+            self.cancelled_tool_call_count += 1
+            event.cancel_tool = (
+                f"Max parallel tool calls ({self.max_parallel_tool_calls}) reached. This tool call was not executed."
+            )
+            logger.debug(
+                f"Cancelled tool call (parallel count {self._parallel_call_count}, limit {self.max_parallel_tool_calls})"
+            )
