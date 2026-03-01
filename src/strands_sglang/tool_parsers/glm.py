@@ -63,8 +63,8 @@ class GLMToolParser(ToolParser):
     def parse(self, text: str) -> list[ToolParseResult]:
         """Parse tool calls from GLM model output.
 
-        Extracts the function name from the first line after ``<tool_call>``,
-        then parses ``<arg_key>``/``<arg_value>`` pairs into a dict.
+        Extracts the function name from the first line after `<tool_call>`,
+        then parses `<arg_key>`/`<arg_value>` pairs into a dict.
 
         Args:
             text: Model output text.

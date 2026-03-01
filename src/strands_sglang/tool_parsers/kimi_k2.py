@@ -36,7 +36,7 @@ class KimiK2ToolParser(ToolParser):
         <|tool_call_begin|>functions.func_name:0<|tool_call_argument_begin|>{"arg": "val"}<|tool_call_end|>
         <|tool_calls_section_end|>
 
-    The function name is extracted from the ``functions.<name>:<index>``
+    The function name is extracted from the `functions.<name>:<index>`
     identifier. Arguments are JSON-encoded dictionaries.
 
     Think Block Handling:
@@ -64,7 +64,7 @@ class KimiK2ToolParser(ToolParser):
     def parse(self, text: str) -> list[ToolParseResult]:
         """Parse tool calls from Kimi K2 model output.
 
-        Finds ``<|tool_calls_section_begin|>`` sections, then extracts
+        Finds `<|tool_calls_section_begin|>` sections, then extracts
         individual calls with their function names and JSON arguments.
 
         Args:

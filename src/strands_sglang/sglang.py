@@ -196,8 +196,8 @@ class SGLangModel(Model):
     ) -> list[dict[str, Any]]:
         """Convert Strands Messages to HF chat template format.
 
-        When ``is_multimodal=False`` (default), content is flattened to a plain string.
-        When ``is_multimodal=True``, content is kept as a list of dicts.
+        When `is_multimodal=False` (default), content is flattened to a plain string.
+        When `is_multimodal=True`, content is kept as a list of dicts.
         """
         result: list[dict[str, Any]] = []
 
@@ -293,8 +293,8 @@ class SGLangModel(Model):
         Subsequent calls: tokenizes only new messages (tool results, user messages),
         prepending the message separator to align with chat template formatting.
 
-        For VLM (when ``self.processor`` is set), uses the processor to insert
-        image placeholder tokens based on ``self.image_data``.
+        For VLM (when `self.processor` is set), uses the processor to insert
+        image placeholder tokens based on `self.image_data`.
         """
 
         def _tokenize(text: str) -> list[int]:

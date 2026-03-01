@@ -20,7 +20,7 @@ Supports three limits:
 - **Call limit** (`max_tool_calls`): counts each individual tool call regardless of
   whether they were parallel or sequential.
 - **Parallel call limit** (`max_parallel_tool_calls`): within a single model response, at most N tool calls are executed. Excess calls are cancelled via
-  ``BeforeToolCallEvent.cancel_tool`` and returned to the model as error results.
+  `BeforeToolCallEvent.cancel_tool` and returned to the model as error results.
 """
 
 import logging

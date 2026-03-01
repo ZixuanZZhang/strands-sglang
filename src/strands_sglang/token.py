@@ -59,7 +59,7 @@ class TokenManager:
         segments[3]: RESPONSE — next model output
         ...                   — alternating PROMPT/RESPONSE until the loop ends
 
-    ``segments[0]`` always contains the full initial prompt from the first
+    `segments[0]` always contains the full initial prompt from the first
     generation call. Everything after it is the rollout.
 
     Example:
