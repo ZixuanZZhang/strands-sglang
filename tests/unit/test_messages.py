@@ -1,11 +1,11 @@
-# Copyright 2025 Horizon RL Contributors
-
+# Copyright 2025-2026 Horizon RL Contributors
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -156,7 +156,7 @@ class TestFormatMessagesRegression:
         ref = ref_format_messages(messages)
 
         assert len(new) == len(ref) == 2
-        for n, r in zip(new, ref):
+        for n, r in zip(new, ref, strict=False):
             assert n["role"] == r["role"] == "tool"
             assert n["tool_call_id"] == r["tool_call_id"]
             assert n["content"] == r["content"]
@@ -200,7 +200,7 @@ class TestFormatMessagesRegression:
         ref = ref_format_messages(messages)
 
         assert len(new) == len(ref) == 3
-        for n, r in zip(new, ref):
+        for n, r in zip(new, ref, strict=False):
             assert n["role"] == r["role"] == "tool"
             assert n["tool_call_id"] == r["tool_call_id"]
             assert n["content"] == r["content"]

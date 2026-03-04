@@ -1,11 +1,11 @@
-# Copyright 2025 Horizon RL Contributors
-
+# Copyright 2025-2026 Horizon RL Contributors
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -154,9 +154,7 @@ class TestVLMMultiTurn:
         async for event in vlm_model.stream(messages):
             events1.append(event)
 
-        first_response = "".join(
-            e["contentBlockDelta"]["delta"]["text"] for e in events1 if "contentBlockDelta" in e
-        )
+        first_response = "".join(e["contentBlockDelta"]["delta"]["text"] for e in events1 if "contentBlockDelta" in e)
         tokens_after_first = len(vlm_model.token_manager)
 
         # Second turn (no new image)

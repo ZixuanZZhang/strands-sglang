@@ -1,11 +1,11 @@
-# Copyright 2025 Horizon RL Contributors
-
+# Copyright 2025-2026 Horizon RL Contributors
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,7 +19,7 @@ from __future__ import annotations
 import importlib.util
 import logging
 import os
-from functools import lru_cache
+from functools import cache
 from typing import TYPE_CHECKING, Any
 
 from .client import DEFAULT_MAX_CONNECTIONS, SGLangClient
@@ -27,10 +27,10 @@ from .client import DEFAULT_MAX_CONNECTIONS, SGLangClient
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from transformers import PreTrainedTokenizer, ProcessorMixin
+    from transformers import PreTrainedTokenizerBase, ProcessorMixin
 
 
-@lru_cache(maxsize=None)
+@cache
 def get_client(
     base_url: str,
     *,
@@ -75,8 +75,8 @@ def get_client_from_slime_args(
     )
 
 
-@lru_cache(maxsize=None)
-def get_tokenizer(tokenizer_path: str) -> PreTrainedTokenizer:
+@cache
+def get_tokenizer(tokenizer_path: str) -> PreTrainedTokenizerBase:
     """Get a shared (cached) tokenizer.
 
     For DeepSeek-V3.2, attach its encoding module to the tokenizer to construct `apply_chat_template()`.
@@ -97,7 +97,7 @@ def get_tokenizer(tokenizer_path: str) -> PreTrainedTokenizer:
     return tokenizer
 
 
-def attach_dsv32_encoding(tokenizer: PreTrainedTokenizer) -> None:
+def attach_dsv32_encoding(tokenizer: PreTrainedTokenizerBase) -> None:
     """Attach DeepSeek-V3.2's encoding module to a tokenizer in-place.
 
     Replaces `apply_chat_template()` with one that delegates to
@@ -115,11 +115,13 @@ def attach_dsv32_encoding(tokenizer: PreTrainedTokenizer) -> None:
         cache_dir = tokenizer.name_or_path
         filepath = os.path.join(cache_dir, "encoding", "encoding_dsv32.py")
         spec = importlib.util.spec_from_file_location("encoding_dsv32", filepath)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Cannot load module spec from {filepath}")
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        logger.info(f"Loaded DeepSeek V3.2's encoding module from {filepath}")
+        logger.info("Loaded DeepSeek V3.2's encoding module from %s", filepath)
     except Exception as e:
-        logger.error(f"Failed to load DeepSeek V3.2's encoding module from {filepath}: {e}")
+        logger.error("Failed to load DeepSeek V3.2's encoding module from %s: %s", filepath, e)
         raise
 
     def apply_chat_template(
@@ -133,9 +135,8 @@ def attach_dsv32_encoding(tokenizer: PreTrainedTokenizer) -> None:
 
         Drop-in replacement for Jinja-based `apply_chat_template()`.
         """
-
         if kwargs:
-            logger.warning(f"DeepSeek V3.2 doesn't support the following kwargs: {kwargs}")
+            logger.warning("DeepSeek V3.2 doesn't support the following kwargs: %s", kwargs)
 
         thinking_mode = "thinking" if enable_thinking else "chat"
 
@@ -159,14 +160,14 @@ def attach_dsv32_encoding(tokenizer: PreTrainedTokenizer) -> None:
             else:
                 messages.insert(0, {"role": "system", "content": "", "tools": tools})
 
-        return module.encode_messages(messages, thinking_mode=thinking_mode)
+        return str(module.encode_messages(messages, thinking_mode=thinking_mode))
 
     # attach the new apply_chat_template to the tokenizer
-    tokenizer.apply_chat_template = apply_chat_template
+    tokenizer.apply_chat_template = apply_chat_template  # type: ignore[method-assign,assignment]
     tokenizer._dsv32_encoding_attached = True
 
 
-@lru_cache(maxsize=None)
+@cache
 def get_processor(processor_path: str) -> ProcessorMixin:
     """Get a shared (cached) multimodal processor.
 

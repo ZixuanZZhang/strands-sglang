@@ -1,11 +1,11 @@
-# Copyright 2025 Horizon RL Contributors
-
+# Copyright 2025-2026 Horizon RL Contributors
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 @register_tool_parser("qwen_xml")
 class QwenXMLToolParser(ToolParser):
-    """Parser for Qwen3-Coder XML tool call format.
+    r"""Parser for Qwen3-Coder XML tool call format.
 
     Format:
         <tool_call>

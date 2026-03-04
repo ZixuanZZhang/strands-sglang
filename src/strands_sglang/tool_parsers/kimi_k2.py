@@ -1,11 +1,11 @@
-# Copyright 2025 Horizon RL Contributors
-
+# Copyright 2025-2026 Horizon RL Contributors
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -98,10 +98,10 @@ class KimiK2ToolParser(ToolParser):
                 try:
                     arguments = json.loads(raw_args)
                     if not isinstance(arguments, dict):
-                        logger.warning(f"Tool parse error: arguments is not a dict for {name}")
+                        logger.warning("Tool parse error: arguments is not a dict for %s", name)
                         arguments = {}
                 except json.JSONDecodeError:
-                    logger.warning(f"Failed to parse arguments for {name}: {raw_args[:200]}")
+                    logger.warning("Failed to parse arguments for %s: %s", name, raw_args[:200])
                     tool_calls.append(ToolParseResult.from_parse_error(id=tool_call_id, raw=raw_args, name=name))
                     continue
 

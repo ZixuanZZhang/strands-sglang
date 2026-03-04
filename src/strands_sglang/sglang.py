@@ -1,42 +1,28 @@
-# Copyright 2025 Horizon RL Contributors
-
+# Copyright 2025-2026 Horizon RL Contributors
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""SGLang native `/generate` API model provider for token-in/token-out training.
-
-This provider uses SGLang's native HTTP APIs:
-- `/generate` for text generation (returns output_ids directly)
-
-It uses a HuggingFace tokenizer for:
-- Applying chat templates (via tokenizer.apply_chat_template())
-- Tokenizing prompts and tool results
-
-This eliminates retokenization drift in RL training by maintaining token IDs
-throughout the rollout instead of converting text back to tokens.
-"""
+"""SGLang model provider with token-in/token-out support."""
 
 from __future__ import annotations
 
 import base64
 import json
 import logging
+from collections.abc import AsyncGenerator, AsyncIterable, Callable, Iterator
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncGenerator,
-    AsyncIterable,
-    Iterator,
-    Type,
     TypedDict,
     TypeVar,
     cast,
@@ -49,7 +35,7 @@ from strands.types.exceptions import (
     ContextWindowOverflowException,
     ModelThrottledException,
 )
-from strands.types.streaming import StreamEvent
+from strands.types.streaming import StopReason, StreamEvent
 from strands.types.tools import ToolChoice, ToolResultContent, ToolSpec
 from typing_extensions import Unpack, override
 
@@ -106,10 +92,11 @@ class SGLangModel(Model):
             tool_parser: `ToolParser` for tool calls (default: `HermesToolParser`).
             **config: Additional SGLang generation configuration.
         """
-
         self.client = client
         self.processor = processor
-        self.tokenizer = (processor and processor.tokenizer) or tokenizer
+        self.tokenizer = cast(
+            "PreTrainedTokenizerBase", (processor and getattr(processor, "tokenizer", None)) or tokenizer
+        )
         if not self.tokenizer:
             raise ValueError("Either tokenizer (text-only) or processor (multimodal) must be provided")
         self.tool_parser = tool_parser or HermesToolParser()
@@ -122,7 +109,7 @@ class SGLangModel(Model):
         self.tool_parse_errors: dict[str, int] = {}  # per-tool parse error count
         self.image_data: list[str] = []  # accumulated image data URLs (VLM only)
 
-        logger.debug(f"initialized with config: {self.config}")
+        logger.debug("initialized with config: %s", self.config)
 
     def reset(self) -> None:
         """Reset token accumulation for a new episode.
@@ -172,11 +159,11 @@ class SGLangModel(Model):
     ) -> dict[str, Any] | str:
         """Convert a single Strands `ContentBlock` or `ToolResultContent` to HF chat template format."""
         # keep dict structure for multimodal content
-        result = {}
+        result: dict[str, Any] = {}
         match content_block:
             case {"text": text}:
                 result = {"type": "text", "text": text}
-            case {"image": image}:
+            case {"image": dict() as image}:
                 mime = f"image/{image['format']}"
                 encoded = base64.b64encode(image["source"]["bytes"]).decode()
                 result = {"type": "image", "image": f"data:{mime};base64,{encoded}"}
@@ -188,7 +175,7 @@ class SGLangModel(Model):
                 raise TypeError(f"content_type=<{next(iter(content_block))}> | unsupported type")
         # flatten to text if not multimodal
         if not is_multimodal:
-            result = result["text"]
+            return str(result["text"])
         return result
 
     @classmethod
@@ -215,13 +202,17 @@ class SGLangModel(Model):
                     assert "toolResult" in cb
                     tr = cb["toolResult"]
                     content = [cls.format_content_block(c, is_multimodal) for c in tr["content"]]
-                    content = content if is_multimodal else content[0]
-                    result.append({"role": "tool", "tool_call_id": tr["toolUseId"], "content": content})
+                    result.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tr["toolUseId"],
+                            "content": content if is_multimodal else content[0],
+                        }
+                    )
             else:
                 # Non-tool content → one HF message (text, image, etc.; toolUse skipped)
                 content = [cls.format_content_block(c, is_multimodal) for c in msg["content"] if "toolUse" not in c]
-                content = content if is_multimodal else content[0]
-                result.append({"role": msg["role"], "content": content})
+                result.append({"role": msg["role"], "content": content if is_multimodal else content[0]})
 
         return result
 
@@ -256,12 +247,14 @@ class SGLangModel(Model):
         chat_messages = self.format_messages(messages, system_prompt, is_multimodal=self.is_multimodal)
         self.image_data.extend(self.extract_image_urls(chat_messages))
         # TODO: add support for other modalities later
-        return self.tokenizer.apply_chat_template(
-            conversation=chat_messages,
-            tools=tools,
-            add_generation_prompt=True,
-            tokenize=False,
-            enable_thinking=self.config.get("enable_thinking"),
+        return str(
+            self.tokenizer.apply_chat_template(
+                conversation=chat_messages,
+                tools=cast(list[dict | Callable], tools),
+                add_generation_prompt=True,
+                tokenize=False,
+                enable_thinking=self.config.get("enable_thinking"),
+            )
         )
 
     @staticmethod
@@ -300,8 +293,8 @@ class SGLangModel(Model):
 
         def _tokenize(text: str) -> list[int]:
             if self.processor:
-                return self.processor(text=text, images=self.image_data or None)["input_ids"][0]
-            return self.tokenizer.encode(text, add_special_tokens=False)
+                return list(self.processor(text=text, images=self.image_data or None)["input_ids"][0])  # type: ignore[arg-type]
+            return list(self.tokenizer.encode(text, add_special_tokens=False))
 
         # First call: full prompt with tools
         if len(self.token_manager) == 0:
@@ -346,7 +339,7 @@ class SGLangModel(Model):
         """
         for tool_call in tool_calls:
             if tool_call.is_error:
-                logger.warning(f"Tool parse error for '{tool_call.name}': {(tool_call.raw or '')[:100]}")
+                logger.warning("Tool parse error for '%s': %s", tool_call.name, (tool_call.raw or "")[:100])
                 # Track parse error count per tool name
                 self.tool_parse_errors[tool_call.name] = self.tool_parse_errors.get(tool_call.name, 0) + 1
 
@@ -458,7 +451,7 @@ class SGLangModel(Model):
             if meta_info["finish_reason"].get("type") == "length":
                 stop_reason = "max_tokens"
 
-        yield {"messageStop": {"stopReason": stop_reason}}
+        yield {"messageStop": {"stopReason": cast(StopReason, stop_reason)}}
 
         # Yield usage metadata
         if meta_info:
@@ -478,7 +471,7 @@ class SGLangModel(Model):
     @override
     async def structured_output(
         self,
-        output_model: Type[T],
+        output_model: type[T],
         prompt: Messages,
         system_prompt: str | None = None,
         **kwargs: Any,

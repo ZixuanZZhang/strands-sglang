@@ -1,28 +1,18 @@
-# Copyright 2025 Horizon RL Contributors
-
+# Copyright 2025-2026 Horizon RL Contributors
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Token management for TITO (Token-In/Token-Out) training.
-
-This module provides:
-- Token: A single token with ID, logprob, and loss mask
-- TokenManager: Manages segment-based token accumulation
-
-For RL training, you typically want:
-- token_ids: Flat list of all tokens for the trajectory
-- loss_mask: Integer mask for loss computation (1 = model output, 0 = prompt/tool)
-- logprobs: Log probabilities for policy gradient
-"""
+"""Token management for token-in/token-out training."""
 
 from __future__ import annotations
 

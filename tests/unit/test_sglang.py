@@ -1,11 +1,11 @@
-# Copyright 2025 Horizon RL Contributors
-
+# Copyright 2025-2026 Horizon RL Contributors
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -220,11 +220,7 @@ class TestExtractLogprobs:
 
     def test_extract_from_meta_info(self, model):
         """Extract logprobs from meta_info."""
-        event = {
-            "meta_info": {
-                "output_token_logprobs": [[-0.5, 100], [-0.3, 200], [-0.1, 300]]
-            }
-        }
+        event = {"meta_info": {"output_token_logprobs": [[-0.5, 100], [-0.3, 200], [-0.1, 300]]}}
         result = model._extract_logprobs(event, "output_token_logprobs")
 
         assert result == [-0.5, -0.3, -0.1]
@@ -263,9 +259,7 @@ class TestYieldToolUseEvents:
 
     def test_single_tool_call(self, model):
         """Yield events for single tool call."""
-        tool_calls = [
-            ToolParseResult(id="call_123", name="calculator", input={"expr": "2+2"})
-        ]
+        tool_calls = [ToolParseResult(id="call_123", name="calculator", input={"expr": "2+2"})]
         events = list(model._yield_tool_use_events(tool_calls))
 
         assert len(events) == 3
@@ -299,9 +293,7 @@ class TestYieldToolUseEvents:
 
     def test_error_tool_call(self, model):
         """Error tool call includes raw content."""
-        tool_calls = [
-            ToolParseResult(id="call_err", name="broken", input={}, raw="invalid json")
-        ]
+        tool_calls = [ToolParseResult(id="call_err", name="broken", input={}, raw="invalid json")]
         events = list(model._yield_tool_use_events(tool_calls))
 
         assert len(events) == 3
