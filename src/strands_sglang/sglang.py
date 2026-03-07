@@ -158,21 +158,21 @@ class SGLangModel(Model):
         cls, content_block: ContentBlock | ToolResultContent, is_multimodal: bool = False
     ) -> dict[str, Any] | str:
         """Convert a single Strands `ContentBlock` or `ToolResultContent` to HF chat template format."""
-        # keep dict structure for multimodal content
+        # ContentBlock / ToolResultContent is a TypedDict with exactly one key set at runtime
+        ((key, value),) = content_block.items()
         result: dict[str, Any] = {}
-        match content_block:
-            case {"text": text}:
+        match key, value:
+            case "text", str() as text:
                 result = {"type": "text", "text": text}
-            case {"image": dict() as image}:
+            case "image", dict() as image:
                 mime = f"image/{image['format']}"
                 encoded = base64.b64encode(image["source"]["bytes"]).decode()
                 result = {"type": "image", "image": f"data:{mime};base64,{encoded}"}
-            case {"json": data}:
-                # json only for tool results
+            case "json", data:
                 result = {"type": "text", "text": json.dumps(data)}
             # TODO: add support for other content types
             case _:
-                raise TypeError(f"content_type=<{next(iter(content_block))}> | unsupported type")
+                raise TypeError(f"content_type=<{key}> | unsupported type")
         # flatten to text if not multimodal
         if not is_multimodal:
             return str(result["text"])
