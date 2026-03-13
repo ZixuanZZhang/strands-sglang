@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "strands-sglang"
-version = "0.3.3"
+dynamic = ["version"]
 description = "SGLang model provider for Strands Agents SDK with Token-in/Token-out support for agentic RL training."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,7 +26,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "strands-agents[openai]",
+    "strands-agents",
     "aiohttp>=3.8.0",
     "transformers>=4.0.0,<5.0.0",
     "jinja2",
@@ -56,8 +56,12 @@ dev = [
     # Development
     "ipykernel>=7.1.0",
     # Agent-level testing
+    "strands-agents[openai]",
     "strands-agents-tools",
 ]
+
+[tool.hatch.version]
+source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/strands_sglang"]
