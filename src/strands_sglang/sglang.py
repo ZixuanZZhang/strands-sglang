@@ -210,13 +210,13 @@ class SGLangModel(Model):
                         {
                             "role": "tool",
                             "tool_call_id": tr["toolUseId"],
-                            "content": content if is_multimodal else content[0],
+                            "content": content if is_multimodal else (content[0] if content else ""),
                         }
                     )
             else:
                 # Non-tool content → one HF message (text, image, etc.; toolUse skipped)
                 content = [cls.format_content_block(c, is_multimodal) for c in msg["content"] if "toolUse" not in c]
-                result.append({"role": msg["role"], "content": content if is_multimodal else content[0]})
+                result.append({"role": msg["role"], "content": content if is_multimodal else (content[0] if content else "")})
 
         return result
 
