@@ -185,27 +185,8 @@ class TestQwenXMLToolParser:
 
         assert len(results) == 1
         assert results[0].name == "calculator"
-        assert results[0].input == {"x": 1, "y": 2}
+        assert results[0].input == {"x": "1", "y": "2"}
         assert results[0].is_error is False
-
-    def test_parse_typed_values(self, parser):
-        """JSON-encoded values are decoded; plain strings kept as-is."""
-        text = """<tool_call>
-<function=create_pet>
-<parameter=name>Buddy</parameter>
-<parameter=age_years>3</parameter>
-<parameter=is_neutered>true</parameter>
-<parameter=temperament_tags>["friendly", "high_energy"]</parameter>
-<parameter=metadata>{"color": "golden", "weight_kg": 30}</parameter>
-</function>
-</tool_call>"""
-        results = parser.parse(text)
-
-        assert results[0].input["name"] == "Buddy"  # plain string
-        assert results[0].input["age_years"] == 3  # int
-        assert results[0].input["is_neutered"] is True  # bool
-        assert results[0].input["temperament_tags"] == ["friendly", "high_energy"]  # list
-        assert results[0].input["metadata"] == {"color": "golden", "weight_kg": 30}  # dict
 
     def test_parse_multiple_tool_calls_with_sequential_ids(self, parser):
         """Multiple calls get sequential call_NNNN IDs."""
